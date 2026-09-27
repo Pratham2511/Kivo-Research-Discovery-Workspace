@@ -1,0 +1,1262 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ==========================================================================
+   KIVO — "THE PAPER BENCH" DESIGN SYSTEM
+   Built on Ethan Schoonover's Solarized palette: a colour scheme engineered
+   around CIELAB lightness relationships for all-day scientific reading.
+   Light mode = Solarized Light (warm paper). Dark mode = Solarized Dark
+   (deep harbour teal). Accents: cyan / green / yellow / orange / magenta /
+   violet / red. No blue. No neon glows. Hard ink borders, offset press
+   shadows, ledger dotted rules, and hatched empty states — the visual
+   language of a well-kept laboratory notebook, not a dashboard.
+   ========================================================================== */
+
+:root {
+  /* -- Solarized Light (paper) ------------------------------------------ */
+  --bg-desk: #eee8d5;          /* base2 — the desk surface */
+  --bg-paper: #fdf6e3;         /* base3 — cards, sheets, panels */
+  --bg-paper-dim: #f5efdc;     /* between base2/base3 — subtle wells */
+  --bg-inset: #e4ddc8;         /* recessed inputs, wells */
+
+  --ink-heading: #073642;      /* base02 — headings, strong ink */
+  --ink-body: #586e75;         /* base01 — body text */
+  --ink-muted: #839496;        /* base0 — muted labels */
+  --ink-faint: #8a9a97;        /* faint metadata (kept ≥2.8:1 on paper) */
+
+  --border-ink: #657b83;       /* base00 — primary 2px card borders */
+  --border-soft: #c8c2ad;      /* hairline dividers on paper */
+  --border-faint: #ddd6c0;
+
+  /* -- Accents: canonical Solarized hues (fills, dots, borders) --------- */
+  --cyan: #2aa198;
+  --green: #859900;
+  --yellow: #b58900;
+  --orange: #cb4b16;
+  --magenta: #d33682;
+  --violet: #6c71c4;
+  --red: #dc322f;
+
+  /* -- Accents: ink-tuned variants for text (light mode, darkened) ------ */
+  --cyan-ink: #17766c;
+  --green-ink: #6d7a00;
+  --yellow-ink: #8a6700;
+  --orange-ink: #b2430e;
+  --magenta-ink: #ad2a68;
+  --violet-ink: #5a5f9e;
+  --red-ink: #bf2f21;
+
+  /* -- Accent washes (flat fills, no gradients) -------------------------- */
+  --cyan-wash: rgba(42, 161, 152, 0.12);
+  --green-wash: rgba(133, 153, 0, 0.13);
+  --yellow-wash: rgba(181, 137, 0, 0.15);
+  --orange-wash: rgba(203, 75, 22, 0.11);
+  --magenta-wash: rgba(211, 54, 130, 0.11);
+  --violet-wash: rgba(108, 113, 196, 0.12);
+  --red-wash: rgba(220, 50, 47, 0.11);
+
+  /* -- Press shadows ------------------------------------------------------ */
+  --press-shadow: 4px 4px 0 rgba(101, 123, 131, 0.22);
+  --press-shadow-lg: 6px 6px 0 rgba(101, 123, 131, 0.25);
+  --press-shadow-inset: inset 2px 2px 0 rgba(101, 123, 131, 0.08);
+
+  /* -- On-solid text ------------------------------------------------------ */
+  --on-cyan: #03303b;
+  --on-ink: #fdf6e3;
+
+  /* -- Typography --------------------------------------------------------- */
+  --font-sans: var(--font-atkinson), -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-atkinson), Georgia, sans-serif;
+  --font-mono: var(--font-plex-mono), "Fira Code", Menlo, monospace;
+
+  /* -- Geometry & motion --------------------------------------------------- */
+  --radius-cut: 2px;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+  color-scheme: light;
+}
+
+.dark {
+  /* -- Solarized Dark (harbour) ------------------------------------------ */
+  --bg-desk: #002b36;          /* base03 — the desk surface */
+  --bg-paper: #073642;         /* base02 — cards, sheets, panels */
+  --bg-paper-dim: #0a3d4a;     /* subtle wells */
+  --bg-inset: #012630;         /* recessed inputs */
+
+  --ink-heading: #eee8d5;      /* base2 — headings */
+  --ink-body: #93a1a1;         /* base1 — body text */
+  --ink-muted: #7c8f8f;        /* muted labels */
+  --ink-faint: #5f7878;        /* faint metadata */
+
+  --border-ink: #586e75;       /* primary 2px card borders */
+  --border-soft: #1d4a54;      /* hairline dividers */
+  --border-faint: #14404b;
+
+  /* Accents stay canonical; ink variants lighten for dark reading */
+  --cyan-ink: #45c7b5;
+  --green-ink: #aeba19;
+  --yellow-ink: #d9ac53;
+  --orange-ink: #e56a35;
+  --magenta-ink: #dd5c96;
+  --violet-ink: #9a9fd0;
+  --red-ink: #ee6a5c;
+
+  --cyan-wash: rgba(42, 161, 152, 0.16);
+  --green-wash: rgba(133, 153, 0, 0.16);
+  --yellow-wash: rgba(181, 137, 0, 0.18);
+  --orange-wash: rgba(203, 75, 22, 0.16);
+  --magenta-wash: rgba(211, 54, 130, 0.16);
+  --violet-wash: rgba(108, 113, 196, 0.18);
+  --red-wash: rgba(220, 50, 47, 0.16);
+
+  --press-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+  --press-shadow-lg: 6px 6px 0 rgba(0, 0, 0, 0.5);
+  --press-shadow-inset: inset 2px 2px 0 rgba(0, 0, 0, 0.28);
+
+  --on-cyan: #012b32;
+
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+html {
+  font-family: var(--font-sans);
+  background-color: var(--bg-desk);
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: var(--bg-desk);
+  color: var(--ink-body);
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-display);
+  color: var(--ink-heading);
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+}
+
+::selection {
+  background: var(--yellow-wash);
+  color: var(--ink-heading);
+}
+
+/* ==========================================================================
+   PAPER CARDS — 2px ink borders + offset press shadows. They read as
+   index slips laid on a desk; hovering lifts them like paper.
+   ========================================================================== */
+
+.bench-card {
+  position: relative;
+  background: var(--bg-paper);
+  border: 2px solid var(--border-ink);
+  border-radius: var(--radius-cut);
+  box-shadow: var(--press-shadow);
+  transition:
+    transform 0.18s var(--ease-out-quart),
+    box-shadow 0.18s var(--ease-out-quart),
+    border-color 0.18s var(--ease-out-quart);
+}
+
+.bench-card-lift:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--press-shadow-lg);
+}
+
+.bench-card-press:active {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 rgba(101, 123, 131, 0.18);
+}
+
+/* Paper slip for individual records — left edge numbered like a ledger */
+.paper-slip {
+  position: relative;
+  background: var(--bg-paper);
+  border: 2px solid var(--border-ink);
+  border-radius: var(--radius-cut);
+  box-shadow: var(--press-shadow);
+  transition:
+    transform 0.18s var(--ease-out-quart),
+    box-shadow 0.18s var(--ease-out-quart),
+    border-color 0.18s var(--ease-out-quart);
+}
+
+.paper-slip:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--press-shadow-lg);
+  border-color: var(--cyan);
+}
+
+.paper-slip.is-saved {
+  border-color: var(--yellow);
+  box-shadow: 4px 4px 0 rgba(181, 137, 0, 0.28);
+}
+
+/* ==========================================================================
+   TICKETS — flat stamp badges. A punched dot + mono caps text.
+   ========================================================================== */
+
+.ticket {
+  /* NOTE: these custom classes are UNLAYERED, so they beat Tailwind's
+     layered utilities in the cascade — a `hidden` utility on a .ticket
+     would be overridden by this display. Never combine .ticket with
+     responsive display utilities; size/wrap containers instead. */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border: 1.5px solid var(--border-soft);
+  border-radius: var(--radius-cut);
+  background: var(--bg-paper-dim);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-body);
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.ticket::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  flex-shrink: 0;
+}
+
+.ticket-cyan   { border-color: var(--cyan);     background: var(--cyan-wash);     color: var(--cyan-ink); }
+.ticket-cyan::before     { background: var(--cyan); }
+.ticket-green  { border-color: var(--green);    background: var(--green-wash);    color: var(--green-ink); }
+.ticket-green::before    { background: var(--green); }
+.ticket-yellow { border-color: var(--yellow);   background: var(--yellow-wash);   color: var(--yellow-ink); }
+.ticket-yellow::before   { background: var(--yellow); }
+.ticket-orange { border-color: var(--orange);   background: var(--orange-wash);   color: var(--orange-ink); }
+.ticket-orange::before   { background: var(--orange); }
+.ticket-magenta { border-color: var(--magenta); background: var(--magenta-wash); color: var(--magenta-ink); }
+.ticket-magenta::before { background: var(--magenta); }
+.ticket-violet { border-color: var(--violet);   background: var(--violet-wash);   color: var(--violet-ink); }
+.ticket-violet::before  { background: var(--violet); }
+.ticket-red    { border-color: var(--red);      background: var(--red-wash);      color: var(--red-ink); }
+.ticket-red::before     { background: var(--red); }
+
+/* Solid ticket — for decisive states (INCLUDED etc.) */
+.ticket-solid-cyan {
+  background: var(--cyan);
+  border-color: var(--cyan);
+  color: var(--on-cyan);
+}
+.ticket-solid-cyan::before { background: var(--on-cyan); }
+
+/* ==========================================================================
+   STAMP LABELS — mono caps eyebrow with a thick ink underline, like a
+   ledger entry heading.
+   ========================================================================== */
+
+.stamp-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-body);
+}
+
+.stamp-label .stamp-num {
+  color: var(--cyan-ink);
+  font-weight: 700;
+}
+
+.stamp-underline {
+  padding-bottom: 4px;
+  border-bottom: 3px solid var(--cyan);
+}
+
+/* ==========================================================================
+   LEDGER RULES — dotted separators from a laboratory notebook
+   ========================================================================== */
+
+.dot-rule {
+  border: 0;
+  border-bottom: 2px dotted var(--border-soft);
+}
+
+.ledger-rule {
+  border: 0;
+  border-bottom: 2px solid var(--border-ink);
+}
+
+/* ==========================================================================
+   BUTTONS — solid press blocks. Primary = solarized cyan slab with ink
+   text. Press = translate into its own shadow (tactile typewriter key).
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: var(--radius-cut);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition:
+    transform 0.12s var(--ease-out-quart),
+    box-shadow 0.12s var(--ease-out-quart),
+    background-color 0.12s var(--ease-out-quart),
+    color 0.12s var(--ease-out-quart),
+    border-color 0.12s var(--ease-out-quart);
+  user-select: none;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--cyan);
+  border-color: var(--ink-heading);
+  color: var(--on-cyan);
+  box-shadow: 3px 3px 0 var(--border-ink);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #2fae9f;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--border-ink);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--border-ink);
+}
+
+.btn-ink {
+  background: var(--ink-heading);
+  border-color: var(--ink-heading);
+  color: var(--on-ink);
+  box-shadow: 3px 3px 0 var(--border-ink);
+}
+.btn-ink:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--border-ink);
+}
+.btn-ink:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--border-ink);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--border-ink);
+  color: var(--ink-body);
+  box-shadow: 3px 3px 0 rgba(101, 123, 131, 0.18);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-paper-dim);
+  color: var(--ink-heading);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 rgba(101, 123, 131, 0.22);
+}
+.btn-ghost:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 rgba(101, 123, 131, 0.18);
+}
+
+.btn-accent-cyan   { background: var(--cyan-wash);   border-color: var(--cyan);   color: var(--cyan-ink); }
+.btn-accent-green  { background: var(--green-wash);  border-color: var(--green);  color: var(--green-ink); }
+.btn-accent-yellow { background: var(--yellow-wash); border-color: var(--yellow); color: var(--yellow-ink); }
+.btn-accent-orange { background: var(--orange-wash); border-color: var(--orange); color: var(--orange-ink); }
+.btn-accent-magenta { background: var(--magenta-wash); border-color: var(--magenta); color: var(--magenta-ink); }
+.btn-accent-red    { background: var(--red-wash);    border-color: var(--red);    color: var(--red-ink); }
+.btn-accent-violet { background: var(--violet-wash); border-color: var(--violet); color: var(--violet-ink); }
+
+.btn-accent-green:hover:not(:disabled),
+.btn-accent-cyan:hover:not(:disabled),
+.btn-accent-yellow:hover:not(:disabled),
+.btn-accent-orange:hover:not(:disabled),
+.btn-accent-magenta:hover:not(:disabled),
+.btn-accent-red:hover:not(:disabled),
+.btn-accent-violet:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+}
+
+/* Small icon-button variant */
+.btn-chip {
+  padding: 6px 10px;
+  font-size: 12px;
+  box-shadow: 2px 2px 0 rgba(101, 123, 131, 0.18);
+}
+.btn-chip.btn-primary,
+.btn-chip.btn-ink { box-shadow: 2px 2px 0 var(--border-ink); }
+.btn-chip.btn-primary:hover:not(:disabled),
+.btn-chip.btn-ink:hover:not(:disabled) { box-shadow: 3px 3px 0 var(--border-ink); }
+
+/* ==========================================================================
+   FIELDS — recessed wells with ink focus rings
+   ========================================================================== */
+
+.field-input {
+  width: 100%;
+  background: var(--bg-inset);
+  border: 2px solid var(--border-soft);
+  border-radius: var(--radius-cut);
+  padding: 9px 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--ink-heading);
+  outline: none;
+  transition: border-color 0.15s var(--ease-out-quart), box-shadow 0.15s var(--ease-out-quart);
+}
+
+.field-input::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.85;
+}
+
+.field-input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-wash);
+}
+
+select.field-input {
+  cursor: pointer;
+}
+
+/* Search command bar — the big one on Discover */
+.search-bar {
+  background: var(--bg-paper);
+  border: 2px solid var(--border-ink);
+  border-radius: var(--radius-cut);
+  box-shadow: var(--press-shadow);
+  transition: border-color 0.18s var(--ease-out-quart), box-shadow 0.18s var(--ease-out-quart);
+}
+
+.search-bar:focus-within {
+  border-color: var(--cyan);
+  box-shadow: 6px 6px 0 rgba(42, 161, 152, 0.3);
+}
+
+/* ==========================================================================
+   MARKER HIGHLIGHT — yellow swipe behind hero words, like a highlighter
+   across a printed page.
+   ========================================================================== */
+
+.marker {
+  position: relative;
+  display: inline-block;
+  padding: 0 0.12em;
+  z-index: 0;
+}
+
+.marker::before {
+  content: "";
+  position: absolute;
+  left: -0.08em;
+  right: -0.08em;
+  bottom: 0.06em;
+  top: 0.12em;
+  background: var(--yellow);
+  opacity: 0.55;
+  z-index: -1;
+  transform: skew(-8deg) rotate(-0.6deg);
+}
+
+/* ==========================================================================
+   HATCH — diagonal engineering hatching for missing / empty data cells
+   ========================================================================== */
+
+/* Hatch used behind disabled/locked rows gets its own softer variant so the
+   label text keeps a clean paper band to sit on (readability over texture). */
+.hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0px,
+    transparent 5px,
+    var(--border-soft) 5px,
+    var(--border-soft) 7px
+  );
+}
+
+.hatch-row {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0px,
+    transparent 9px,
+    color-mix(in srgb, var(--border-soft) 55%, transparent) 9px,
+    color-mix(in srgb, var(--border-soft) 55%, transparent) 12px
+  );
+}
+
+/* ==========================================================================
+   KPI CELLS — flat stat blocks with a thick top rule in the metric colour
+   ========================================================================== */
+
+.stat-cell {
+  position: relative;
+  background: var(--bg-paper);
+  border: 2px solid var(--border-ink);
+  border-radius: var(--radius-cut);
+  box-shadow: 3px 3px 0 rgba(101, 123, 131, 0.18);
+  padding: 16px 18px 14px;
+  overflow: hidden;
+}
+
+.stat-cell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--cyan);
+}
+
+.stat-cell.tone-green::before  { background: var(--green); }
+.stat-cell.tone-yellow::before { background: var(--yellow); }
+.stat-cell.tone-orange::before { background: var(--orange); }
+.stat-cell.tone-red::before    { background: var(--red); }
+.stat-cell.tone-magenta::before { background: var(--magenta); }
+.stat-cell.tone-violet::before { background: var(--violet); }
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--ink-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-sub {
+  font-size: 12px;
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
+
+/* ==========================================================================
+   NAVIGATION — sidebar entries with big mono indices
+   ========================================================================== */
+
+.nav-entry {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-cut);
+  border: 2px solid transparent;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-body);
+  cursor: pointer;
+  transition:
+    background-color 0.15s var(--ease-out-quart),
+    border-color 0.15s var(--ease-out-quart),
+    color 0.15s var(--ease-out-quart),
+    transform 0.15s var(--ease-out-quart);
+  text-align: left;
+}
+
+.nav-entry:hover {
+  background: var(--bg-paper-dim);
+  color: var(--ink-heading);
+  border-color: var(--border-soft);
+}
+
+.nav-entry.is-active {
+  background: var(--bg-paper);
+  border-color: var(--ink-heading);
+  color: var(--ink-heading);
+  box-shadow: 3px 3px 0 rgba(101, 123, 131, 0.2);
+  transform: translateX(-2px);
+}
+
+.nav-index {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.nav-entry.is-active .nav-index {
+  color: var(--cyan-ink);
+}
+
+.nav-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--cyan);
+  color: var(--on-cyan);
+  min-width: 20px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: var(--radius-cut);
+}
+
+/* Mobile tab strip */
+.tab-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.tab-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 2px solid var(--border-soft);
+  border-radius: var(--radius-cut);
+  background: var(--bg-paper-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-out-quart);
+}
+
+.tab-pill.is-active {
+  background: var(--ink-heading);
+  border-color: var(--ink-heading);
+  color: var(--on-ink);
+}
+
+/* ==========================================================================
+   PAPER-STACK LOADER — three stacked sheets shuffling while sources respond
+   ========================================================================== */
+
+@keyframes stackShuffle {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33%      { transform: translate(-3px, -3px) rotate(-2deg); }
+  66%      { transform: translate(3px, -1px) rotate(1.5deg); }
+}
+
+.stack-sheet {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--border-ink);
+  border-radius: var(--radius-cut);
+  background: var(--bg-paper);
+}
+
+.stack-sheet:nth-child(1) { animation: stackShuffle 1.3s infinite var(--ease-out-quart); }
+.stack-sheet:nth-child(2) { animation: stackShuffle 1.3s infinite 0.15s var(--ease-out-quart); opacity: 0.85; }
+.stack-sheet:nth-child(3) { animation: stackShuffle 1.3s infinite 0.3s var(--ease-out-quart); opacity: 0.7; }
+
+@keyframes caretBlink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.caret::after {
+  content: "▍";
+  animation: caretBlink 1s steps(1) infinite;
+  color: var(--cyan-ink);
+}
+
+/* ==========================================================================
+   MOTION UTILITIES
+   ========================================================================== */
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-rise {
+  animation: riseIn 0.45s var(--ease-out-quart) both;
+}
+
+/* Source flash — briefly outlines the abstract or a PDF page when a
+   grounded answer receipt sends the reader to its evidence. */
+@keyframes sourceFlash {
+  0%   { box-shadow: 0 0 0 0 transparent;            background-color: transparent; }
+  15%  { box-shadow: 0 0 0 3px var(--magenta);       background-color: var(--magenta-wash); }
+  70%  { box-shadow: 0 0 0 3px var(--magenta);       background-color: var(--magenta-wash); }
+  100% { box-shadow: 0 0 0 0 transparent;            background-color: transparent; }
+}
+
+.source-flash {
+  animation: sourceFlash 1.6s var(--ease-out-quart) both;
+  border-radius: var(--radius-cut);
+}
+
+/* Grounded-answer receipt — lift on hover, magenta accent on focus. */
+.ask-receipt {
+  transition: border-color 0.18s var(--ease-out-quart),
+              background-color 0.18s var(--ease-out-quart),
+              transform 0.18s var(--ease-out-quart);
+}
+.ask-receipt:hover  { transform: translateX(2px); }
+.ask-receipt:focus-visible {
+  outline: 2px solid var(--magenta);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   READING LAYER (FUTURE_FEATURES #11) — jargon heatmap marks + gloss cards
+   ========================================================================== */
+
+/* A detected jargon term inside the approachable-abstract copy: a yellow
+   marker wash with a dotted underline, deepening on hover. Reads as a
+   highlighter stroke, not a link — it carries its gloss as a title. */
+.jargon-term {
+  background-color: var(--yellow-wash);
+  color: var(--ink-heading);
+  border-bottom: 2px dotted var(--yellow);
+  padding: 0 2px;
+  margin: 0 -1px;
+  border-radius: 1px;
+  cursor: help;
+  transition: background-color 0.15s var(--ease-out-quart),
+              border-color 0.15s var(--ease-out-quart);
+}
+.jargon-term:hover {
+  background-color: var(--yellow);
+  color: var(--on-ink);
+  border-bottom-color: var(--ink-heading);
+}
+
+/* A lexicon gloss card: term in mono yellow ink over its one-sentence
+   plain-language gloss, on a soft well background. */
+.gloss-card {
+  border: 1.5px solid var(--border-soft);
+  border-left: 4px solid var(--yellow);
+  background: var(--bg-paper-dim);
+  border-radius: var(--radius-cut);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.18s var(--ease-out-quart),
+              transform 0.18s var(--ease-out-quart),
+              box-shadow 0.18s var(--ease-out-quart);
+}
+.gloss-card:hover {
+  border-color: var(--yellow);
+  transform: translateY(-1px);
+  box-shadow: 2px 2px 0 var(--yellow-wash);
+}
+
+/* ==========================================================================
+   SEMINAR LAYER (FUTURE_FEATURES #9) — κ report hero, step strip, diff rows
+   ========================================================================== */
+
+/* The κ hero cell — one big chance-corrected agreement number with its
+   Landis–Koch interpretation stamped underneath. */
+.kappa-hero {
+  border: 2px solid var(--border-ink);
+  border-radius: var(--radius-cut);
+  background: var(--bg-paper);
+  box-shadow: var(--press-shadow);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+}
+.kappa-hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: var(--orange);
+}
+.kappa-hero .kappa-value {
+  font-family: var(--font-mono);
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink-heading);
+  letter-spacing: -0.02em;
+}
+.kappa-hero .kappa-band {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--orange-ink);
+}
+
+/* Seminar step chip — one numbered station in the export → blind screen →
+   κ rail. */
+.seminar-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1.5px solid var(--border-soft);
+  border-radius: var(--radius-cut);
+  background: var(--bg-paper-dim);
+  padding: 12px 14px;
+}
+.seminar-step .step-index {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--border-ink);
+  border-radius: 50%;
+  background: var(--bg-paper);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-heading);
+}
+
+/* One paper row in the disagreement table: both decisions as stamped chips
+   with the two reasons quoted underneath. */
+.diff-row {
+  border: 1.5px solid var(--border-soft);
+  border-left: 4px solid var(--red);
+  border-radius: var(--radius-cut);
+  background: var(--bg-paper);
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+}
+.diff-row.is-both-screened { border-left-color: var(--red); }
+.diff-row.is-only-them    { border-left-color: var(--violet); }
+
+@media print {
+  .jargon-term { border-bottom: none; background: none; font-weight: 700; }
+  .gloss-card, .diff-row, .seminar-step { break-inside: avoid; box-shadow: none; }
+}
+
+
+@keyframes livePulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.35); opacity: 0.65; }
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 2px var(--green-wash);
+  animation: livePulse 2.2s infinite ease-in-out;
+  flex-shrink: 0;
+}
+
+@keyframes sweepLine {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+.sweep::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 25%;
+  background: var(--cyan-wash);
+  animation: sweepLine 1.4s infinite linear;
+}
+
+/* ==========================================================================
+   ARGUMENT BUILDER — Toulmin claim cards, receipt rows, evidence pool
+   ========================================================================== */
+
+/* The claim card: a bench card whose header is a cyan "beam" the claim
+   rests on. Evidence receipts hang below it with stance-coloured spines. */
+.claim-card {
+  transition: border-color 0.18s var(--ease-out-quart),
+              box-shadow 0.18s var(--ease-out-quart),
+              transform 0.18s var(--ease-out-quart);
+}
+
+.claim-card.is-selected {
+  border-color: var(--magenta);
+  box-shadow:
+    6px 6px 0 rgba(211, 54, 130, 0.18),
+    0 0 0 1px var(--magenta);
+}
+
+.claim-beam {
+  border-bottom: 2px dashed var(--border-soft);
+  background: linear-gradient(
+    to bottom,
+    var(--cyan-wash),
+    transparent
+  );
+  padding: 10px 16px;
+  border-radius: var(--radius-cut) var(--radius-cut) 0 0;
+  position: relative;
+}
+
+.claim-beam::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--cyan);
+  border-radius: var(--radius-cut) var(--radius-cut) 0 0;
+}
+
+/* One attached receipt: stance spine on the left, soft paper fill. */
+.receipt-row {
+  background: var(--bg-paper);
+  border: 1px solid var(--border-soft);
+  border-left-width: 3px;
+  border-radius: var(--radius-cut);
+  padding: 10px 12px;
+  transition: background-color 0.15s var(--ease-out-quart),
+              border-color 0.15s var(--ease-out-quart);
+}
+
+.receipt-row:hover {
+  background: var(--bg-paper-dim);
+  border-color: var(--border-ink);
+}
+
+/* Evidence pool rows: compact slips that lift when hovered. */
+.pool-row {
+  background: var(--bg-paper);
+  border: 2px solid var(--border-soft);
+  border-radius: var(--radius-cut);
+  padding: 10px 12px;
+  transition: border-color 0.15s var(--ease-out-quart),
+              transform 0.15s var(--ease-out-quart),
+              background-color 0.15s var(--ease-out-quart);
+}
+
+.pool-row:hover {
+  border-color: var(--border-ink);
+  transform: translateY(-1px);
+  background: var(--bg-paper-dim);
+}
+
+/* The scrollable pool + outline panes get a thin flat scrollbar. */
+.pool-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-ink) transparent;
+}
+
+.pool-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pool-list::-webkit-scrollbar-thumb {
+  border: none;
+  border-radius: 0;
+}
+
+/* Markdown outline preview — the "typed draft" look. */
+.outline-preview {
+  background: var(--bg-inset);
+  border: 2px solid var(--border-soft);
+  border-left: 4px solid var(--green);
+  border-radius: var(--radius-cut);
+  padding: 14px 16px;
+  max-height: 360px;
+  overflow-y: auto;
+  color: var(--ink-body);
+  scrollbar-width: thin;
+}
+
+.outline-preview::-webkit-scrollbar {
+  width: 6px;
+}
+
+/* ==========================================================================
+   SCROLLBARS — flat ink bars
+   ========================================================================== */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-desk);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-ink);
+  border: 2px solid var(--bg-desk);
+  border-radius: var(--radius-cut);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cyan);
+}
+
+/* ==========================================================================
+   REDUCED MOTION — respect the OS-level preference for UI animations too
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .live-dot,
+  .stack-sheet,
+  .sweep::after,
+  .caret::after,
+  .source-flash,
+  .kappa-hero .kappa-value {
+    animation: none !important;
+  }
+  .ask-receipt,
+  .ask-receipt:hover {
+    transform: none !important;
+  }
+  .bench-card-lift:hover,
+  .paper-slip:hover,
+  .pool-row:hover,
+  .nav-entry.is-active,
+  .btn-primary:hover:not(:disabled),
+  .btn-ink:hover:not(:disabled),
+  .btn-ghost:hover:not(:disabled) {
+    transform: none;
+  }
+  .claim-card,
+  .receipt-row,
+  .pool-row {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   PRINT — students print evidence matrices and PRISMA diagrams. Strip the
+   chrome, flatten the shadows, keep the ink.
+   ========================================================================== */
+
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .fixed.inset-0,          /* background canvas */
+  aside[aria-label="Workspace sections"],
+  header.lg\:hidden,       /* mobile top bar */
+  footer,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  main > div {
+    max-width: 100% !important;
+  }
+  .bench-card,
+  .paper-slip,
+  .claim-card,
+  .stat-cell {
+    box-shadow: none !important;
+    border-color: #000 !important;
+    break-inside: avoid;
+  }
+  .claim-card.is-selected {
+    box-shadow: none !important;
+    border-color: #000 !important;
+  }
+  .claim-beam {
+    background: none !important;
+  }
+  .hatch {
+    background-image: repeating-linear-gradient(
+      -45deg, transparent 0px, transparent 5px, #999 5px, #999 7px
+    ) !important;
+  }
+  .bench-table {
+    font-size: 10px;
+  }
+}
+
+/* ==========================================================================
+   MISC
+   ========================================================================== */
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Table inside bench cards */
+.bench-table {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+}
+
+.bench-table th {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: 12px 14px;
+  border-bottom: 2px solid var(--border-ink);
+  background: var(--bg-paper-dim);
+  white-space: nowrap;
+}
+
+.bench-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--ink-body);
+  vertical-align: middle;
+}
+
+.bench-table tbody tr:hover td {
+  background: var(--bg-paper-dim);
+}
+
+/* focus visibility for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* Shared thin flat scrollbar for in-panel scroll lists (κ report, ask
+   thread, pools) — matches the flat engineering look instead of the
+   platform's rounded grey floats. */
+.bench-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-soft) transparent;
+}
+.bench-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.bench-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.bench-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-soft);
+  border: 2px solid var(--bg-paper);
+  border-radius: 0;
+}
+.bench-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--border-ink);
+}
+
+/* Disclosure widgets (<details>) — hide the default triangle on WebKit so
+   the chevron icon in the label leads, and give summaries a clean ring. */
+summary { list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+  border-radius: var(--radius-cut);
+}
+
+/* Bare prose links (access blocks, source links): cyan ink underline that
+   deepens on hover, never the browser default blue. */
+.prose-link,
+.bench-card a:not([class]) {
+  color: var(--cyan-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--cyan);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s var(--ease-out-quart),
+              color 0.15s var(--ease-out-quart);
+}
+.prose-link:hover,
+.bench-card a:not([class]):hover {
+  color: var(--ink-heading);
+  text-decoration-color: var(--ink-heading);
+}
+
+/* The κ value stamps onto the report like a rubber stamp hitting paper. */
+@keyframes stampIn {
+  0%   { transform: scale(1.5) rotate(-5deg); opacity: 0; }
+  60%  { transform: scale(0.96) rotate(1deg);  opacity: 1; }
+  100% { transform: scale(1) rotate(0deg);     opacity: 1; }
+}
+.kappa-hero .kappa-value {
+  display: inline-block;
+  animation: stampIn 0.5s var(--ease-out-quart) both;
+  transform-origin: 50% 60%;
+}
+
+/* Sticky-header offset when jumping to anchors */
+[id] {
+  scroll-margin-top: 24px;
+}
+
+/* Sonner toast — ink-border press style to match the bench */
+.sonner-toast-group {
+  --border-radius: 2px;
+}
+
+[data-sonner-toast] {
+  border: 2px solid var(--border-ink) !important;
+  border-radius: var(--radius-cut) !important;
+  box-shadow: 4px 4px 0 rgba(101, 123, 131, 0.25) !important;
+  background: var(--bg-paper) !important;
+  color: var(--ink-heading) !important;
+  font-family: var(--font-sans) !important;
+}
