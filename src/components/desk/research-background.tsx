@@ -116,7 +116,7 @@ export function ResearchBackground() {
       sheetDark: "#0a0809",
       border: "101, 123, 131",
       textLine: "101, 123, 131",
-      accents: ["42, 161, 152", "133, 153, 0", "181, 137, 0", "203, 75, 22"],
+      accents: ["42, 161, 152", "133, 153, 0", "181, 137, 0", "255, 0, 85"],
       filament: "101, 123, 131",
       shadow: "rgba(88, 110, 117, 0.35)",
     };

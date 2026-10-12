@@ -22,9 +22,9 @@
   --border-ink: #303030;
   --border-soft: #262626;
   --border-faint: #1c1c1c;
-  --accent: #ff8a3d;
-  --accent-hover: #ffa365;
-  --accent-wash: rgba(255, 138, 61, .10);
+  --accent: #FF0055;
+  --accent-hover: #ff3377;
+  --accent-wash: rgba(255, 0, 85, .10);
   --cyan: var(--accent);
   --green: var(--accent);
   --yellow: var(--accent);
@@ -38,7 +38,7 @@
   --orange-ink: var(--accent);
   --magenta-ink: var(--accent);
   --violet-ink: var(--accent);
-  --red-ink: #ffb68a;
+  --red-ink: #ff8fb4;
   --cyan-wash: var(--accent-wash);
   --green-wash: var(--accent-wash);
   --yellow-wash: var(--accent-wash);
@@ -71,16 +71,16 @@
   --border-ink: #d2d2d2;
   --border-soft: #e1e1e1;
   --border-faint: #ebebeb;
-  --accent: #ff8a3d;
-  --accent-hover: #ffa365;
-  --accent-wash: rgba(220, 85, 0, .08);
-  --cyan-ink: #a64100;
-  --green-ink: #a64100;
-  --yellow-ink: #a64100;
-  --orange-ink: #a64100;
-  --magenta-ink: #a64100;
-  --violet-ink: #a64100;
-  --red-ink: #a64100;
+  --accent: #FF0055;
+  --accent-hover: #ff3377;
+  --accent-wash: rgba(255, 0, 85, .08);
+  --cyan-ink: #c70042;
+  --green-ink: #c70042;
+  --yellow-ink: #c70042;
+  --orange-ink: #c70042;
+  --magenta-ink: #c70042;
+  --violet-ink: #c70042;
+  --red-ink: #c70042;
   color-scheme: light;
 }
 

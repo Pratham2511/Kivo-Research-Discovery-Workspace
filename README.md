@@ -16,12 +16,12 @@
 
 <p align="center">
   <a href="https://github.com/Pratham2511/Kivo-Research-Discovery-Workspace/actions/workflows/ci.yml"><img src="https://github.com/Pratham2511/Kivo-Research-Discovery-Workspace/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-orange" alt="MIT license" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-FF0055" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs" alt="Next.js 16" />
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5" />
 </p>
 
-![Kivo landing page with its search-first interface and orange accents](docs/screenshots/landing-dark.jpg)
+![Kivo landing page with its search-first interface, flower video, and hot-crimson accents](docs/screenshots/landing-dark.jpg)
 
 ## Why Kivo?
 
@@ -60,7 +60,7 @@ Screenshots show the current application using public research records. The live
 | Review | Practice recall with evidence flashcards and an SM-2 spaced-repetition schedule. |
 | Alerts | Save standing queries and use **Check now** to collect newly found records. |
 
-The default theme uses **pure black, white, and orange**, with an optional light theme, keyboard focus states, and a responsive layout.
+The default theme uses **pure black, white, and hot crimson (`#FF0055`)**, with an optional light theme, keyboard focus states, and a responsive layout. The landing page pairs DM Serif Display headings with Libre Franklin text and an unaltered flower video.
 
 ### Optional reading assistance
 

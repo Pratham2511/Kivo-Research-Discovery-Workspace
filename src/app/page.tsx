@@ -3,9 +3,24 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { DM_Serif_Display, Libre_Franklin } from "next/font/google";
 import { ArrowRight, ArrowUpRight, Search, Bookmark, Quote, Files } from "lucide-react";
 import { KivoLogo } from "@/components/kivo-logo";
 import styles from "./landing.module.css";
+
+const displayFont = DM_Serif_Display({
+  variable: "--font-dm-serif",
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  display: "swap",
+});
+const bodyFont = Libre_Franklin({
+  variable: "--font-libre-franklin",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
 
 const workflow = [
   { Icon: Search, title: "Search the literature", copy: "Look across Crossref, arXiv, and Europe PMC in one search. Follow official source and PDF links." },
@@ -22,7 +37,7 @@ export default function Home() {
   }
 
   return (
-    <main className={styles.site}>
+    <main className={`${styles.site} ${displayFont.variable} ${bodyFont.variable}`}>
       <a href="#landing-search" className="skip-link">Skip to search</a>
       <header className={styles.header}>
         <Link href="/" aria-label="Kivo home"><KivoLogo /></Link>
@@ -33,9 +48,9 @@ export default function Home() {
           <video autoPlay muted loop playsInline preload="metadata"><source src="/kivo-media/flower.mp4" type="video/mp4" /></video>
         </div>
         <div className={styles.heroContent}>
-          <p className={styles.eyebrow}>A workspace for curious minds</p>
-          <h1>Find the paper.<br /><span>Keep the proof.</span></h1>
-          <p className={styles.intro}>From a first question to a well-supported review.<br className={styles.desktopBreak} /> Find, read, and connect the research that matters.</p>
+          <p className={styles.eyebrow}>YOUR RESEARCH, IN FOCUS</p>
+          <h1><span>Thousands of Papers</span><span>One Clear Path to</span><em>Discovery</em></h1>
+          <p className={styles.intro}>Find the work. Follow the evidence.<br />Shape what comes next.</p>
           <form id="landing-search" onSubmit={submit} className={styles.search}>
             <label className={styles.searchInput}><Search size={20} /><span className="sr-only">Search research papers</span>
               <input value={query} onChange={event => setQuery(event.target.value)} maxLength={1000} placeholder="What are you researching?" required /></label>

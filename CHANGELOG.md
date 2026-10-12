@@ -9,6 +9,15 @@ For the live product overview, quick start, and architecture, see the
 
 ---
 
+## Unreleased — crimson identity and landing hero
+
+- Replace orange brand accents with hot crimson (`#FF0055`) across the landing page, workspace, logo, and diagram exports; retain readable darker accent text in the light theme.
+- Recreate the landing hero with the requested three-line title, italic “Discovery,” DM Serif Display headings, and Libre Franklin supporting text.
+- Use the supplied flower video unchanged, with responsive positioning and a neutral dark fade that keeps the search and headline readable.
+- Refresh the README theme description and screenshots to match the current interface.
+
+Validated with lint, TypeScript checks, all 17 regression tests, a production build, mobile and desktop layouts, native video playback, and a live-provider search from the landing page.
+
 ## Unreleased — research workflow fixes and redesign
 
 - Default pure-black theme with white/orange accents, a custom Kivo logo, a search-first landing page, and grouped responsive workspace navigation.
