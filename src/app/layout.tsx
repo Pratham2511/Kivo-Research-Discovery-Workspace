@@ -3,7 +3,6 @@ import { Bricolage_Grotesque, Atkinson_Hyperlegible, IBM_Plex_Mono } from "next/
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { ResearchBackground } from "@/components/desk/research-background";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -24,9 +23,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KIVO — The Evidence Desk",
+  title: "Kivo | Find papers. Keep the proof.",
   description:
-    "A local-first research workbench for discovering scholarly records, tracing citations, capturing source-grounded evidence, and synthesising literature reviews.",
+    "Find the work, keep the evidence, and shape what comes next. A local-first research desk for thoughtful literature reviews.",
   icons: { icon: "/logo.svg" },
   openGraph: {
     title: "KIVO — The Evidence Desk",
@@ -39,8 +38,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#eee8d5" },
-    { media: "(prefers-color-scheme: dark)", color: "#002b36" },
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
 };
 
@@ -50,17 +49,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body
         className={`${bricolage.variable} ${atkinson.variable} ${plexMono.variable} antialiased`}
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="dark"
+          storageKey="kivo-theme-v2"
           enableSystem={false}
           disableTransitionOnChange
         >
-          <ResearchBackground />
           {children}
           <Toaster position="bottom-right" offset={16} />
         </ThemeProvider>

@@ -1,122 +1,83 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { emptyWorkspace, type Workspace } from "@/lib/workspace/schema";
-import { mergeWorkspace, normalizeWorkspace } from "@/lib/workspace/repository";
+import { emptyWorkspace, validateEvidence, type Workspace } from "@/lib/workspace/schema";
+import { BrowserWorkspaceRepository, normalizeWorkspace } from "@/lib/workspace/repository";
 import { localCache } from "@/lib/workspace/storage-engine";
+import { persistWorkspace } from "@/lib/workspace/persistence";
 
-export type StorageStatus =
-  | "local"
-  | "synced"
-  | "memory";
+export type StorageStatus = "local" | "memory";
 
-/**
- * Browser-first workspace state.
- *
- * The working set (saved papers, projects, evidence, compare tray, search
- * history, alerts, inbox) lives authoritatively in localStorage; the server
- * is an optional relay. The initial render always starts from an empty
- * workspace so server HTML and first client paint match exactly — the real
- * state is hydrated in an effect immediately after mount.
+/** IndexedDB is authoritative; localStorage is a small-workspace fallback.
+ * The server relay does not persist research and is deliberately not called.
  */
 export function useWorkspace() {
-  const [state, setState] = useState<Workspace>(() => emptyWorkspace());
-
+  const [state, setState] = useState<Workspace>(emptyWorkspace);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [storageStatus, setStorageStatus] = useState<StorageStatus>("local");
+  const [error, setError] = useState("");
   const stateRef = useRef(state);
+  const readyRef = useRef(false);
+  const repository = useRef(new BrowserWorkspaceRepository());
+  const writeQueue = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
-
-  // Hydrate from localStorage on client mount & check optional remote sync
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const cached = localCache.loadSync();
-    setState(cached);
-    stateRef.current = cached;
-    setReady(true);
-
-    // Optional background sync with backend if available
-    const tryRemoteSync = async () => {
+    let cancelled = false;
+    async function hydrate() {
+      let stored: Workspace | null = null;
       try {
-        const response = await fetch("/api/workspace", { cache: "no-store" });
-        if (response.ok) {
-          const body = await response.json();
-          if (body && body.state) {
-            // Local-first merge: the browser's working set is authoritative;
-            // the relay contributes additions but can never delete locally
-            // captured work (papers, evidence, claims) in a stale snapshot.
-            const remoteState = normalizeWorkspace(body.state);
-            const merged = mergeWorkspace(cached, remoteState);
-            setState(merged);
-            stateRef.current = merged;
-            localCache.saveSync(merged);
-            setStorageStatus("synced");
-          }
-        } else {
-          setStorageStatus("local");
-        }
+        stored = await repository.current.load();
       } catch {
-        // Backend relay is offline - continue smoothly in pure local mode
-        setStorageStatus("local");
+        // A blocked/private browser may still allow the localStorage fallback.
+        await Promise.resolve();
       }
-    };
-
-    void tryRemoteSync();
+      if (cancelled || readyRef.current) return;
+      const next = stored ?? localCache.loadSync();
+      stateRef.current = next;
+      setState(next);
+      if (!stored) {
+        const result = await persistWorkspace(next, repository.current, localCache);
+        if (cancelled) return;
+        setStorageStatus(result.durable ? "local" : "memory");
+        setError(result.error);
+      }
+      readyRef.current = true;
+      setReady(true);
+    }
+    void hydrate();
+    return () => { cancelled = true; };
   }, []);
 
-  // Mutate function: synchronous local write + background sync
-  const mutate = useCallback(
-    async (change: (draft: Workspace) => void): Promise<boolean> => {
+  const mutate = useCallback((change: (draft: Workspace) => void): Promise<boolean> => {
+    const run = async () => {
+      if (!readyRef.current) return false;
       setSaving(true);
       try {
-        const current = structuredClone(stateRef.current);
-        change(current);
-        const next = normalizeWorkspace(current);
-
-        // 1. Instant synchronous write to localStorage
-        localCache.saveSync(next);
-
-        // 2. Immediate UI state update
-        setState(next);
+        const draft = structuredClone(stateRef.current);
+        change(draft);
+        const next = normalizeWorkspace(draft);
+        const invalid = validateEvidence(next);
+        if (invalid) throw new Error(invalid);
+        const result = await persistWorkspace(next, repository.current, localCache);
+        // Keep work available for backup even when both browser stores fail.
         stateRef.current = next;
-
-        // 3. Non-blocking background sync
-        void fetch("/api/workspace", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ state: next, revision: Date.now() }),
-        })
-          .then((res) => {
-            if (res.ok) setStorageStatus("synced");
-            else setStorageStatus("local");
-          })
-          .catch(() => {
-            setStorageStatus("local");
-          });
-
-        return true;
-      } catch (err) {
-        console.error("Mutation failed", err);
+        setState(next);
+        setStorageStatus(result.durable ? "local" : "memory");
+        setError(result.error);
+        return result.durable;
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Your change could not be saved. Try again.");
         return false;
       } finally {
         setSaving(false);
       }
-    },
-    []
-  );
+    };
+    // Rapid captures/toggles cannot race the asynchronous IndexedDB writes.
+    const pending = writeQueue.current.then(run, run);
+    writeQueue.current = pending;
+    return pending;
+  }, []);
 
-  return {
-    state,
-    mutate,
-    ready,
-    saving,
-    storageStatus,
-    error: "",
-    reload: async () => {},
-  };
+  return { state, mutate, ready, saving, storageStatus, error };
 }

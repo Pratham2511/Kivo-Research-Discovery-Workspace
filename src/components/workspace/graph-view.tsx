@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   forceCollide,
   forceLink,
@@ -79,6 +79,15 @@ interface GraphLink {
 const W = 820;
 const H = 560;
 
+function subscribeGraphCenter(callback: () => void) {
+  const onStorage = (event: StorageEvent) => { if (event.key === "kivo_graph_center") callback(); };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
+function storedGraphCenter() {
+  try { return localStorage.getItem("kivo_graph_center"); } catch { return null; }
+}
+
 export function GraphView({
   papers,
   initialPaperId,
@@ -86,24 +95,33 @@ export function GraphView({
   onToggleSave,
   savedPaperIds,
 }: GraphViewProps) {
-  const [centerPaperId, setCenterPaperId] = useState<string | null>(
+  const [selectedCenterId, setCenterPaperId] = useState<string | null>(
     initialPaperId ?? null,
   );
+  const storedCenterId = useSyncExternalStore(subscribeGraphCenter, storedGraphCenter, () => null);
+  const centerPaperId = [selectedCenterId, storedCenterId].find(id => papers.some(paper => paper.id === id)) ?? papers[0]?.id ?? null;
   const centerPaper = useMemo(
     () => papers.find((p) => p.id === centerPaperId) ?? null,
     [papers, centerPaperId],
   );
 
-  const [refs, setRefs] = useState<CitationNeighbor[]>([]);
-  const [cites, setCites] = useState<CitationNeighbor[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [rawRefs, setRefs] = useState<CitationNeighbor[]>([]);
+  const [rawCites, setCites] = useState<CitationNeighbor[]>([]);
+  const [loadedCenterId, setLoadedCenterId] = useState<string | null>(null);
+  const loading = !!centerPaper && loadedCenterId !== centerPaperId;
+  const [graphError, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const error = loadedCenterId === centerPaperId ? graphError : null;
+  const refs = useMemo(() => loadedCenterId === centerPaperId ? rawRefs : [], [loadedCenterId, centerPaperId, rawRefs]);
+  const cites = useMemo(() => loadedCenterId === centerPaperId ? rawCites : [], [loadedCenterId, centerPaperId, rawCites]);
 
   /* ------------------------------------------------------------- fetch */
   const fetchGraph = useCallback(async (paper: Paper) => {
-    setSelectedId(null);
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     const candidates = toS2IdCandidates(paper);
     let lastApiError: string | null = null;
 
@@ -115,6 +133,7 @@ export function GraphView({
       try {
         const res = await fetch(
           `/api/citations?paperId=${encodeURIComponent(id)}&type=${type}`,
+          { signal: controller.signal },
         );
         if (!res.ok) {
           try {
@@ -132,8 +151,6 @@ export function GraphView({
       }
     };
 
-    setLoading(true);
-    setError(null);
 
     try {
       // Probe each identifier candidate with the refs side (a 404 fails
@@ -155,6 +172,7 @@ export function GraphView({
         try {
           const res = await fetch(
             `/api/citations?paperId=SEARCH&title=${encodeURIComponent(paper.title.slice(0, 200))}&type=refs`,
+          { signal: controller.signal },
           );
           if (res.ok) {
             const data = await res.json();
@@ -176,6 +194,7 @@ export function GraphView({
         }
       }
 
+      if (controller.signal.aborted) return;
       if (!winner) {
         if (candidates.length === 0) {
           setError(
@@ -200,6 +219,7 @@ export function GraphView({
         try {
           const res = await fetch(
             `/api/citations?paperId=SEARCH&title=${encodeURIComponent(paper.title.slice(0, 200))}&type=cites`,
+          { signal: controller.signal },
           );
           if (res.ok) {
             const data = await res.json();
@@ -212,6 +232,8 @@ export function GraphView({
         citeNeighbors = (await fetchSide(winner, "cites")) ?? [];
       }
 
+      if (controller.signal.aborted) return;
+      setError(null);
       setRefs(refNeighbors);
       setCites(citeNeighbors);
 
@@ -227,7 +249,7 @@ export function GraphView({
         );
       }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoadedCenterId(paper.id);
     }
   }, []);
 
@@ -236,20 +258,11 @@ export function GraphView({
     if (centerPaper) void fetchGraph(centerPaper);
   }, [centerPaper, fetchGraph]);
 
-  // Default to the first saved paper on mount when nothing is centered.
   useEffect(() => {
-    if (!centerPaperId && papers.length > 0) setCenterPaperId(papers[0].id);
-  }, [centerPaperId, papers]);
-
-  // Restore the last explored center (component-local convenience only).
-  useEffect(() => {
-    if (initialPaperId) return;
-    const stored = localStorage.getItem("kivo_graph_center");
-    if (stored && papers.some((p) => p.id === stored)) setCenterPaperId(stored);
-  }, [initialPaperId, papers]);
-
-  useEffect(() => {
-    if (centerPaperId) localStorage.setItem("kivo_graph_center", centerPaperId);
+    if (centerPaperId) {
+      try { localStorage.setItem("kivo_graph_center", centerPaperId); } catch { /* optional convenience */ }
+    }
+    return () => { requestRef.current?.abort(); };
   }, [centerPaperId]);
 
   /* ------------------------------------------------------------- layout */
@@ -379,7 +392,7 @@ export function GraphView({
     a.download = `citation-map-${(centerPaper?.title ?? "graph").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}.svg`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Map exported", { description: "Standalone SVG, Solarized ink included." });
+    toast.success("Map exported", { description: "Standalone SVG with source labels." });
   };
 
   const labelNodes = useMemo(
@@ -465,7 +478,7 @@ export function GraphView({
               References
             </span>
             <span className="flex items-center gap-1.5 text-[var(--ink-heading)]">
-              <span className="inline-block w-3 h-3 border-2 border-[var(--border-ink)] bg-[var(--orange)]" aria-hidden="true" />
+              <span className="inline-block w-3 h-3 border-2 border-[var(--border-ink)] bg-[var(--ink-heading)]" aria-hidden="true" />
               Cited by
             </span>
             <span className="flex items-center gap-1.5 text-[var(--ink-muted)]">
@@ -516,7 +529,7 @@ export function GraphView({
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
-                  stroke={l.side === "refs" ? "var(--cyan)" : "var(--orange)"}
+                  stroke={l.side === "refs" ? "var(--cyan)" : "var(--ink-heading)"}
                   strokeWidth={1.4}
                   strokeOpacity={0.55}
                 />
@@ -530,7 +543,7 @@ export function GraphView({
                   ? "var(--ink-heading)"
                   : n.side === "refs"
                     ? "var(--cyan)"
-                    : "var(--orange)";
+                    : "var(--ink-heading)";
               return (
                 <g
                   key={n.id}

@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible problem in Kivo.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Use public or synthetic records. Do not share credentials, private research notes, full workspace backups, or identifying browser data."
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the affected section and a public example query or paper identifier.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include sanitized errors or screenshots if useful.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser, device, theme, and deployment
+      placeholder: "Firefox, desktop, Dark, live demo or local commit"
+    validations:
+      required: true

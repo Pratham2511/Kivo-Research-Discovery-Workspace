@@ -1,14 +1,15 @@
 {
   "name": "kivo",
   "version": "3.6.0",
-  "description": "Kivo — The Evidence Desk. A local-first research workbench for students: discovery, page-anchored evidence, grounded Q&A, spaced repetition, citation maps and seminar agreement, all in the browser.",
+  "description": "Kivo \u2014 The Evidence Desk. A local-first research workbench for students: discovery, page-anchored evidence, grounded Q&A, spaced repetition, citation maps and seminar agreement, all in the browser.",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ./scripts/register-tests.mjs scripts/research-flows.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",

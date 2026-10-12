@@ -34,7 +34,9 @@ const schema = z
       .min(1)
       .max(7)
       .optional(),
-    limit: z.number().int().min(1).max(50).default(20),
+    // A full bounded snapshot lets the UI paginate independently of a
+    // serverless instance's short-lived cursor cache.
+    limit: z.number().int().min(1).max(150).default(20),
     cursor: z.string().max(100).optional(),
   })
   .refine(

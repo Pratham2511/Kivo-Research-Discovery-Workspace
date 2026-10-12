@@ -18,7 +18,7 @@ bun run dev          # http://localhost:3000
 ```
 
 No database and no API keys are required: the workspace is browser-first
-(localStorage), and the default academic sources (Crossref, arXiv, Europe
+(IndexedDB with a localStorage fallback), and the default academic sources (Crossref, arXiv, Europe
 PMC) are key-free.
 
 ## Code style
@@ -26,6 +26,7 @@ PMC) are key-free.
 - **TypeScript everywhere**, strict mode. Run `bun run typecheck` before
   pushing.
 - **ESLint** must pass: `bun run lint`.
+- Run `bun run test` (Node.js 22+) and `bun run build` for changes to research workflows.
 - Prefer the existing design-system classes in `src/app/globals.css`
   (`.bench-card`, `.paper-slip`, `.ticket-*`, `.stat-cell`, …) over ad-hoc
   Tailwind chains for new surfaces — that is what keeps the desk visually
@@ -39,7 +40,8 @@ PMC) are key-free.
 
 | Path | What lives there |
 | --- | --- |
-| `src/app/page.tsx` | The single route — mounts the desk |
+| `src/app/page.tsx` | Search-first landing page |
+| `src/app/workspace/page.tsx` | Research desk and initial search query |
 | `src/components/workspace/` | Views (discover, reader, library, projects, compare, alerts, review, citation map, builder) |
 | `src/lib/academic/` | Academic source adapters, orchestrator, dedup, ranking, citations |
 | `src/lib/workspace/` | Schema (zod, versioned), storage engine, exports, SRS, seminar, PRISMA flow |
@@ -61,12 +63,14 @@ PMC) are key-free.
 
 1. Fork / branch from `main`.
 2. Make your change; add UI in the existing design language.
-3. `bun run lint && bun run typecheck` must pass.
+3. Lint, typecheck, research-flow tests, and the production build must pass.
 4. Open a pull request describing what changed and how you verified it in
   the browser (the README's Verification sections show the expected depth).
 
 ## Reporting bugs
 
 Open an issue with: what you did, what you expected, what happened, which
-theme (Solarized Light/Dark), and the browser + viewport. Console output
+theme (Dark/Light), and the browser + viewport. Sanitized console output
 helps.
+
+Use public or synthetic research records in examples. Never include API keys, real environment files, private workspace exports, or personal research notes in commits or public reports. Local QA artifacts are ignored; curated screenshots belong in `docs/screenshots/`.

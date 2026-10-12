@@ -140,14 +140,6 @@ export function StancePanel({ paper }: StancePanelProps) {
     }
   }, []);
 
-  // Reset + (re)load when the panel opens or the paper changes underneath it.
-  useEffect(() => {
-    setContexts(null);
-    setError(null);
-    setFilter("all");
-    if (open) void fetchContexts(paper);
-  }, [paper.id, open, fetchContexts, paper]);
-
   const verdicts = useMemo(() => {
     if (!contexts) return [];
     return contexts.map((c) => ({ ...c, verdict: classifyStance(c.context) }));
@@ -168,7 +160,14 @@ export function StancePanel({ paper }: StancePanelProps) {
     <section className="bench-card p-5 sm:p-6 space-y-4">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          const next = !open;
+          setOpen(next);
+          if (next && contexts === null && !loading) {
+            setFilter("all");
+            void fetchContexts(paper);
+          }
+        }}
         className="w-full flex items-center gap-2.5 text-left group"
         aria-expanded={open}
       >

@@ -1,4 +1,5 @@
 import { emptyWorkspace, workspaceSchema, type Workspace } from "./schema";
+import { newestSnapshot, nextSaveTime, observeSaveTime, type WorkspaceSnapshot } from "./storage-snapshot";
 
 /**
  * The browser is the primary home for a researcher's working set. The server
@@ -8,14 +9,17 @@ import { emptyWorkspace, workspaceSchema, type Workspace } from "./schema";
  */
 export interface WorkspaceRepository {
   load(): Promise<Workspace | null>;
-  save(state: Workspace): Promise<void>;
+  save(state: Workspace, savedAt?: string): Promise<void>;
 }
 
 const DATABASE_NAME = "kivo-workspace";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "research";
-const RECORD_KEY = "primary-workspace";
+// A new record key makes the cache-to-IndexedDB migration explicit. Older
+// IndexedDB records must not overwrite newer localStorage research.
+const RECORD_KEY = "primary-workspace-v2";
 const LEGACY_LOCAL_KEYS = [
+  "kivo_workspace_cache_v1",
   "scholar-nexus:workspace:v1",
   "scholarnexus-workspace",
 ];
@@ -36,7 +40,24 @@ export class BrowserWorkspaceRepository implements WorkspaceRepository {
     const record = await request<StoredWorkspace | undefined>(
       database.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(RECORD_KEY),
     );
-    if (record) return decodeWorkspace(record.state);
+    const indexedState = record ? decodeWorkspace(record.state) : null;
+    const indexed = indexedState ? { state: indexedState, savedAt: record!.savedAt } : null;
+    if (indexed) observeSaveTime(indexed.savedAt);
+    // A fallback write can be newer than the last successful IndexedDB write.
+    // A cache read failure must not prevent loading a valid database record.
+    let cached: WorkspaceSnapshot | null = null;
+    try {
+      const raw = window.localStorage.getItem("kivo_workspace_cache_v1");
+      if (raw) cached = decodeCacheSnapshot(JSON.parse(raw));
+    } catch { /* Leave unreadable cache data intact for recovery. */ }
+    if (cached) observeSaveTime(cached.savedAt);
+    const newest = newestSnapshot(indexed, cached);
+    if (newest) {
+      if (newest === cached) {
+        try { await this.save(newest.state, newest.savedAt); } catch { /* The cache is still durable. */ }
+      }
+      return newest.state;
+    }
 
     // A one-time migration path for the short-lived pre-repository browser key.
     for (const key of LEGACY_LOCAL_KEYS) {
@@ -46,24 +67,29 @@ export class BrowserWorkspaceRepository implements WorkspaceRepository {
         const migrated = decodeWorkspace(JSON.parse(raw));
         if (migrated) {
           await this.save(migrated);
-          window.localStorage.removeItem(key);
+          if (key !== "kivo_workspace_cache_v1") window.localStorage.removeItem(key);
           return migrated;
         }
       } catch {
-        window.localStorage.removeItem(key);
+        // Preserve an invalid legacy value for recovery instead of deleting it.
       }
     }
-    return null;
+    const legacy = await request<StoredWorkspace | undefined>(
+      database.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get("primary-workspace"),
+    );
+    const previous = legacy ? decodeWorkspace(legacy.state) : null;
+    if (previous) await this.save(previous);
+    return previous;
   }
 
-  async save(state: Workspace): Promise<void> {
+  async save(state: Workspace, savedAt = nextSaveTime()): Promise<void> {
     const normalized = normalizeWorkspace(state);
     const database = await this.open();
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put({
       key: RECORD_KEY,
       schemaVersion: DATABASE_VERSION,
-      savedAt: new Date().toISOString(),
+      savedAt,
       state: normalized,
     } satisfies StoredWorkspace);
     await transactionDone(transaction);
@@ -85,6 +111,13 @@ export class BrowserWorkspaceRepository implements WorkspaceRepository {
     });
     return this.database;
   }
+}
+
+export function decodeCacheSnapshot(value: unknown): WorkspaceSnapshot | null {
+  if (!value || typeof value !== "object" || !("state" in value) || !("savedAt" in value)) return null;
+  if (typeof value.savedAt !== "string" || !Number.isFinite(Date.parse(value.savedAt))) return null;
+  const state = decodeWorkspace(value.state);
+  return state ? { state, savedAt: value.savedAt } : null;
 }
 
 export function normalizeWorkspace(candidate: Workspace): Workspace {

@@ -9,6 +9,19 @@ For the live product overview, quick start, and architecture, see the
 
 ---
 
+## Unreleased — research workflow fixes and redesign
+
+- Default pure-black theme with white/orange accents, a custom Kivo logo, a search-first landing page, and grouped responsive workspace navigation.
+- Browse up to 150 retrieved papers in 20-paper pages; preserve results on failed searches and restore original relevance when changing the sort back.
+- Make provider controls capability-driven; validate search filters and source URLs; distinguish DOI source pages from PDF links.
+- Export only filtered library records in BibTeX, CSV, and JSON.
+- Extract PDF text in the browser to avoid serverless upload limits; preserve page anchors and distinct document identities.
+- Activate IndexedDB storage, retain the localStorage fallback, serialize writes, recover newer fallback records, and show truthful storage/backup status.
+- Fix React lifecycle/memoization lint errors, enforce build type checking, and add 17 research-flow regression tests to CI.
+- Refresh the README with current screenshots, setup, configuration, data-handling limits, and contribution templates.
+
+Validated with lint, TypeScript checks, regression tests, a production build, 20 API checks, filtered downloads, an eight-page public PDF, a 5 MB synthetic PDF, persistence across reloads, and a mobile viewport.
+
 ## v3.7 - provider-agnostic AI
 
 Kivo no longer ships with — or routes through — any bundled AI middleware.

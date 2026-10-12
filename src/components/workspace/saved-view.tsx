@@ -83,14 +83,14 @@ export function SavedView({
   };
 
   const handleExportBibtex = () => {
-    const bib = bibliography(papers as unknown as Parameters<typeof bibliography>[0], "bib");
+    const bib = bibliography(filteredPapers as unknown as Parameters<typeof bibliography>[0], "bib");
     downloadFile(bib, "kivo-library.bib", "text/plain");
   };
 
   const handleExportCsv = () => {
     const rows = [
       ["Title", "Authors", "Year", "Venue", "DOI", "Citations", "Abstract"],
-      ...papers.map((p) => [
+      ...filteredPapers.map((p) => [
         p.title,
         p.authors.join("; "),
         p.year ?? "",
@@ -104,7 +104,7 @@ export function SavedView({
   };
 
   const handleExportJson = () => {
-    const json = JSON.stringify(papers, null, 2);
+    const json = JSON.stringify(filteredPapers, null, 2);
     downloadFile(json, "kivo-library.json", "application/json");
   };
 
@@ -284,6 +284,7 @@ export function SavedView({
                 <button
                   type="button"
                   onClick={handleExportBibtex}
+                  disabled={!hasMatches}
                   className="btn btn-ghost btn-chip h-11 text-[11px] font-mono uppercase tracking-wider"
                   title="Export as BibTeX"
                 >
@@ -293,6 +294,7 @@ export function SavedView({
                 <button
                   type="button"
                   onClick={handleExportCsv}
+                  disabled={!hasMatches}
                   className="btn btn-accent-green btn-chip h-11 text-[11px] font-mono uppercase tracking-wider"
                   title="Export as CSV"
                 >
@@ -302,6 +304,7 @@ export function SavedView({
                 <button
                   type="button"
                   onClick={handleExportJson}
+                  disabled={!hasMatches}
                   className="btn btn-ghost btn-chip h-11 text-[11px] font-mono uppercase tracking-wider"
                   title="Export as JSON"
                 >

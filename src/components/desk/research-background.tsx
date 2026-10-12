@@ -35,10 +35,8 @@ interface CitationNode {
 /**
  * KIVO Floating Scientific Manuscripts & Citation Graph Canvas.
  *
- * Kept motion, re-skinned for the Solarized era: the canvas reads its
- * palette from CSS custom properties and re-reads them whenever the theme
- * class flips, so the drifting sheets feel at home on both the cream
- * Paper desk and the deep Harbour desk.
+ * The canvas reads the active Kivo palette from CSS custom properties and
+ * re-reads it whenever the theme class changes.
  *
  * - Drifting research documents in zero-gravity with realistic perspective tilt
  * - Micro-details: document text skeleton, folded dog-ear corners, miniature charts
@@ -87,8 +85,7 @@ export function ResearchBackground() {
     document.documentElement.addEventListener("mouseleave", handleMouseLeave);
 
     // ------------------------------------------------------------------
-    // Theme palette: read Solarized variables from the document, then
-    // re-read whenever the .dark class toggles.
+    // Read the Kivo palette from the document and refresh it when the theme changes.
     // ------------------------------------------------------------------
     interface Palette {
       sheetLight: string;
@@ -115,8 +112,8 @@ export function ResearchBackground() {
     };
 
     let palette: Palette = {
-      sheetLight: "#fdf6e3",
-      sheetDark: "#eee8d5",
+      sheetLight: "#280a13",
+      sheetDark: "#0a0809",
       border: "101, 123, 131",
       textLine: "101, 123, 131",
       accents: ["42, 161, 152", "133, 153, 0", "181, 137, 0", "203, 75, 22"],
@@ -131,8 +128,8 @@ export function ResearchBackground() {
         toRgbTriplet(cs.getPropertyValue(v) || "#2aa198"),
       );
       palette = {
-        sheetLight: isDark ? "#0b414d" : "#fdf6e3",
-        sheetDark: isDark ? "#073642" : "#f5efdc",
+        sheetLight: isDark ? "#280a13" : "#40101e",
+        sheetDark: isDark ? "#0a0809" : "#140a0e",
         border: toRgbTriplet(cs.getPropertyValue("--border-ink") || "#657b83"),
         textLine: toRgbTriplet(cs.getPropertyValue("--ink-muted") || "#839496"),
         accents,

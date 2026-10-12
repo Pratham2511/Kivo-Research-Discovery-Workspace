@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { BookOpen, Compass } from "lucide-react";
 import { toast } from "sonner";
 import { useWorkspace } from "./use-workspace";
 import { WorkspaceShell, type ActiveSection } from "../workspace/workspace-shell";
-import { DiscoverView, type SearchFilters } from "../workspace/discover-view";
+import { DiscoverView } from "../workspace/discover-view";
+import { searchValidation, sortSearchPapers, SEARCH_SNAPSHOT_LIMIT, type SearchFilters } from "@/lib/workspace/search";
 import { ReaderView } from "../workspace/reader-view";
 import { SavedView } from "../workspace/saved-view";
 import { ProjectsView } from "../workspace/projects-view";
@@ -32,6 +33,7 @@ import {
 
 interface DeskProps {
   section?: "discover" | "reading" | "projects" | "updates";
+  initialQuery?: string;
 }
 
 function uid(): string {
@@ -44,19 +46,8 @@ function now(): string {
   return new Date().toISOString();
 }
 
-/** Client-side ranking of a result snapshot according to the chosen sort. */
-function sortPapers(papers: Paper[], sort: SearchFilters["sort"]): Paper[] {
-  if (sort === "year") {
-    return [...papers].sort((a, b) => (b.year || 0) - (a.year || 0));
-  }
-  if (sort === "citations") {
-    return [...papers].sort((a, b) => (b.citationCount || 0) - (a.citationCount || 0));
-  }
-  return papers; // relevance — keep upstream order
-}
-
-export function Desk({ section }: DeskProps) {
-  const { state, mutate, storageStatus } = useWorkspace();
+export function Desk({ section, initialQuery = "" }: DeskProps) {
+  const { state, mutate, storageStatus, ready, error: storageError } = useWorkspace();
 
   // Active view routing
   const [currentSection, setCurrentSection] = useState<ActiveSection>(() => {
@@ -66,17 +57,19 @@ export function Desk({ section }: DeskProps) {
     return "discover";
   });
 
+  const [readerReturnSection, setReaderReturnSection] = useState<ActiveSection>("discover");
+
   // Active paper in reader
-  const [activeReaderPaper, setActiveReaderPaper] = useState<Paper | null>(null);
+  const [selectedReaderPaper, setActiveReaderPaper] = useState<Paper | null>(null);
 
   // Active project
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setActiveProjectId] = useState<string | null>(null);
 
   // Graph explorer: which library paper the map should center on
   const [graphCenterId, setGraphCenterId] = useState<string | null>(null);
 
   // Search state
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedProviders, setSelectedProviders] = useState<string[]>([
     "Crossref",
     "arXiv",
@@ -85,25 +78,35 @@ export function Desk({ section }: DeskProps) {
   const [filters, setFilters] = useState<SearchFilters>({
     sort: "relevance",
   });
-  const [searchResults, setSearchResults] = useState<Paper[]>([]);
+  const [rawSearchResults, setSearchResults] = useState<Paper[]>([]);
+  const searchResults = useMemo(() => sortSearchPapers(rawSearchResults, filters.sort), [rawSearchResults, filters.sort]);
+  const [searchPageIndex, setSearchPageIndex] = useState(0);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [resultsQuery, setResultsQuery] = useState("");
+  const [searchError, setSearchError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<
-    Array<{ source: string; status?: string; error?: string; durationMs: number }>
-  >([]);
+  const [diagnostics, setDiagnostics] = useState<Array<{ source: string; status?: string; error?: string; durationMs: number }>>([]);
+  const [configuredProviders, setConfiguredProviders] = useState<Record<string, boolean>>({
+    Crossref: true, arXiv: true, "Europe PMC": true,
+  });
+  const requestRef = useRef<AbortController | null>(null);
+  const initialSearchStarted = useRef(false);
 
-  // Initialize active project if exists
-  useEffect(() => {
-    if (state.projects.length > 0 && !activeProjectId) {
-      setActiveProjectId(state.projects[0].id);
-    }
-  }, [state.projects, activeProjectId]);
+  const activeReaderPaper = selectedReaderPaper ?? (currentSection === "reading" ? state.papers[0] ?? null : null);
+  const activeProjectId = state.projects.some((p) => p.id === selectedProjectId) ? selectedProjectId : state.projects[0]?.id ?? null;
 
-  // If activeReaderPaper is not set but reader route was requested, default to first saved paper
   useEffect(() => {
-    if (currentSection === "reading" && !activeReaderPaper && state.papers.length > 0) {
-      setActiveReaderPaper(state.papers[0]);
-    }
-  }, [currentSection, activeReaderPaper, state.papers]);
+    const controller = new AbortController();
+    void fetch("/api/search", { signal: controller.signal })
+      .then((response) => response.json())
+      .then((body) => {
+        if (!controller.signal.aborted && Array.isArray(body.providers)) {
+          setConfiguredProviders(Object.fromEntries(body.providers.map((provider: { name: string; configured: boolean }) => [provider.name, provider.configured])));
+        }
+      })
+      .catch(() => {});
+    return () => { controller.abort(); requestRef.current?.abort(); };
+  }, []);
 
   // Derived sets for O(1) membership checks
   const savedPaperIds = useMemo(
@@ -116,85 +119,86 @@ export function Desk({ section }: DeskProps) {
     [state.compare]
   );
 
-  // Search action
   const handleSearch = useCallback(
-    async (q: string) => {
-      if (!q.trim()) return;
+    async (q: string, nextFilters = filters, nextProviders = selectedProviders) => {
+      const invalid = searchValidation(q, nextFilters, nextProviders);
+      if (invalid) { setSearchError(invalid); return; }
+      requestRef.current?.abort();
+      const controller = new AbortController();
+      requestRef.current = controller;
+      setSearchError("");
       setIsSearching(true);
-      setDiagnostics([]);
-
+      const payload = {
+        query: q.trim(),
+        filters: {
+          yearFrom: nextFilters.yearFrom, yearTo: nextFilters.yearTo,
+          openAccessOnly: nextFilters.openAccess, minCitations: nextFilters.minCitations,
+        },
+        sources: nextProviders,
+        limit: SEARCH_SNAPSHOT_LIMIT,
+      };
       try {
-        // Filters are nested for the API contract; `sort` is applied locally
-        // on the returned snapshot so the dropdown actually re-orders results.
-        const payload = {
-          query: q.trim(),
-          filters: {
-            yearFrom: filters.yearFrom,
-            yearTo: filters.yearTo,
-            openAccessOnly: filters.openAccess,
-            minCitations: filters.minCitations,
-          },
-          sources: selectedProviders,
-        };
-
-        const res = await fetch("/api/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+        const response = await fetch("/api/search", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload), signal: controller.signal,
         });
-
-        const data = await res.json();
-        if (res.ok && Array.isArray(data.papers)) {
-          setSearchResults(sortPapers(data.papers, filters.sort));
-          // The API reports per-source telemetry under `sources`; normalise it
-          // into the diagnostics shape the views expect.
-          const sourceTelemetry: Array<{
-            source: string;
-            status?: string;
-            error?: string;
-            durationMs: number;
-          }> = (data.sources || []).map(
-            (s: { source: string; status?: string; error?: string; durationMs: number }) => ({
-              source: s.source,
-              status: s.status,
-              error: s.error,
-              durationMs: s.durationMs,
-            })
-          );
-          setDiagnostics(sourceTelemetry);
-
-          // Record in workspace searches history
-          void mutate((draft) => {
-            draft.searches.unshift({
-              id: uid(),
-              query: q.trim(),
-              filters: payload as unknown as Record<string, unknown>,
-              providers: selectedProviders,
-              createdAt: now(),
-              papers: data.papers.slice(0, 50),
-              diagnostics: sourceTelemetry,
-            });
-            if (draft.searches.length > 50) {
-              draft.searches = draft.searches.slice(0, 50);
-            }
-          });
-        } else {
-          setSearchResults([]);
+        const data = await response.json().catch(() => null);
+        if (controller.signal.aborted) return;
+        if (!response.ok || !Array.isArray(data?.papers)) {
+          const details = Array.isArray(data?.details) ? data.details.join(" ") : "";
+          throw new Error(details || data?.error || (response.status === 429
+            ? "Too many searches. Wait a minute, then try again."
+            : "Search could not finish. Your previous results are still available. Try again."));
         }
-      } catch (err) {
-        console.error("Search failed", err);
-        setSearchResults([]);
+        const telemetry = (data.sources ?? []).map((source: { source: string; status?: string; error?: string; durationMs: number }) => ({
+          source: source.source, status: source.status, error: source.error, durationMs: source.durationMs,
+        }));
+        setSearchResults(data.papers);
+        setResultsQuery(q.trim());
+        setDiagnostics(telemetry);
+        setSearchPageIndex(0);
+        setHasSearched(true);
+        void mutate((draft) => {
+          draft.searches.unshift({
+            id: uid(), query: q.trim(), filters: nextFilters as Record<string, unknown>,
+            providers: nextProviders, createdAt: now(), papers: data.papers,
+            diagnostics: telemetry, coverage: data.coverage,
+          });
+          draft.searches = draft.searches.slice(0, 50);
+        });
+      } catch (cause) {
+        if (!controller.signal.aborted) {
+          setSearchError(cause instanceof Error ? cause.message : "Search could not connect. Try again.");
+        }
       } finally {
-        setIsSearching(false);
+        if (requestRef.current === controller) setIsSearching(false);
       }
-    },
-    [filters, selectedProviders, mutate]
+    }, [filters, selectedProviders, mutate],
   );
 
-  // Re-apply local sort when the sort control changes with results on screen
   useEffect(() => {
-    setSearchResults((prev) => (prev.length > 0 ? sortPapers(prev, filters.sort) : prev));
-  }, [filters.sort]);
+    if (!initialQuery || !ready || initialSearchStarted.current) return;
+    const timer = setTimeout(() => {
+      initialSearchStarted.current = true;
+      void handleSearch(initialQuery);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [initialQuery, ready, handleSearch]);
+
+  const handleRestoreSearch = (search: typeof state.searches[number]) => {
+    const legacy = search.filters.filters as Record<string, unknown> | undefined;
+    const saved = legacy ?? search.filters;
+    const restored: SearchFilters = {
+      yearFrom: saved.yearFrom as number | undefined, yearTo: saved.yearTo as number | undefined,
+      minCitations: saved.minCitations as number | undefined,
+      openAccess: (saved.openAccess ?? saved.openAccessOnly) as boolean | undefined,
+      sort: (saved.sort as SearchFilters["sort"]) ?? "relevance",
+    };
+    setSearchQuery(search.query);
+    setFilters(restored);
+    setSelectedProviders(search.providers);
+    void handleSearch(search.query, restored, search.providers);
+  };
 
   // Import papers from BibTeX / RIS into the library
   const handleImportPapers = useCallback(
@@ -229,6 +233,10 @@ export function Desk({ section }: DeskProps) {
   const handleToggleSave = useCallback(
     (paper: Paper) => {
       const wasSaved = state.papers.some((p) => p.id === paper.id);
+      if (wasSaved && (state.evidence.some((e) => e.paperId === paper.id) || state.projects.some((p) => p.members.some((m) => m.paperId === paper.id)))) {
+        toast.info("This paper belongs to your research", { description: "It has captured evidence or screening decisions, so it stays in your library." });
+        return;
+      }
       void mutate((draft) => {
         const index = draft.papers.findIndex((p) => p.id === paper.id);
         if (index >= 0) {
@@ -298,10 +306,11 @@ export function Desk({ section }: DeskProps) {
 
   // Open Paper in Reader View
   const handleOpenReader = useCallback((paper: Paper) => {
+    if (currentSection !== "reading") setReaderReturnSection(currentSection);
     setActiveReaderPaper(paper);
     setCurrentSection("reading");
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [currentSection]);
 
   // Add Paper to Current Project
   const handleAddToProject = useCallback(
@@ -593,7 +602,7 @@ export function Desk({ section }: DeskProps) {
         }
         draft.documents = draft.documents.filter((d) => d.paperId !== paper.id);
         draft.documents.push({
-          id: `doc-${doc.hash.slice(0, 12)}`,
+          id: "doc-" + uid(),
           paperId: paper.id,
           name: doc.name,
           hash: doc.hash,
@@ -661,6 +670,7 @@ export function Desk({ section }: DeskProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: alert.query,
+            limit: SEARCH_SNAPSHOT_LIMIT,
             filters: {},
             sources: alert.providers.length > 0 ? alert.providers : ["Crossref", "arXiv", "Europe PMC"],
           }),
@@ -992,7 +1002,9 @@ export function Desk({ section }: DeskProps) {
       dueReviewCount={dueReviewCount}
       unbackedClaimsCount={unbackedClaimsCount}
       onExportSnapshot={handleExportSnapshot}
+      storageError={storageError}
     >
+      {!ready ? <div className="workspace-loading" role="status">Opening your research workspace…</div> : <>
       {/* 1. Discover View */}
       {currentSection === "discover" && (
         <DiscoverView
@@ -1001,9 +1013,16 @@ export function Desk({ section }: DeskProps) {
           selectedProviders={selectedProviders}
           setSelectedProviders={setSelectedProviders}
           filters={filters}
-          setFilters={setFilters}
+          setFilters={(next) => { setSearchPageIndex(0); setFilters(next); }}
           onSearch={handleSearch}
           isSearching={isSearching}
+          hasSearched={hasSearched}
+          resultsQuery={resultsQuery}
+          error={searchError}
+          pageIndex={searchPageIndex}
+          onPageChange={setSearchPageIndex}
+          onRestoreSearch={handleRestoreSearch}
+          configuredProviders={configuredProviders}
           results={searchResults}
           diagnostics={diagnostics}
           recentSearches={state.searches}
@@ -1020,8 +1039,9 @@ export function Desk({ section }: DeskProps) {
       {currentSection === "reading" &&
         (activeReaderPaper ? (
           <ReaderView
+            key={activeReaderPaper.id}
             paper={activeReaderPaper}
-            onBack={() => setCurrentSection("discover")}
+            onBack={() => setCurrentSection(readerReturnSection)}
             isSaved={savedPaperIds.has(activeReaderPaper.id)}
             isCompared={comparedPaperIds.has(activeReaderPaper.id)}
             onToggleSave={handleToggleSave}
@@ -1141,6 +1161,7 @@ export function Desk({ section }: DeskProps) {
       {/* 8. Citation map — force-directed explorer */}
       {currentSection === "graph" && (
         <GraphView
+          key={graphCenterId ?? "library"}
           papers={state.papers}
           initialPaperId={graphCenterId}
           onOpenReader={handleOpenReaderFromAnywhere}
@@ -1168,6 +1189,7 @@ export function Desk({ section }: DeskProps) {
           onNavigateToDiscover={() => setCurrentSection("discover")}
         />
       )}
+      </>}
     </WorkspaceShell>
   );
 }

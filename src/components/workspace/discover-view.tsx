@@ -1,60 +1,41 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import {
-  Search,
-  SlidersHorizontal,
-  History,
-  Database,
-  ArrowRight,
-  BookOpen,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Compass,
-  Layers,
-  ShieldCheck,
-  KeyRound,
-  Zap,
-} from "lucide-react";
+import { useEffect, useRef, type FormEvent } from "react";
+import { Search, SlidersHorizontal, ArrowRight, ArrowLeft, Check, ChevronDown, History, AlertCircle, ExternalLink } from "lucide-react";
 import type { Workspace } from "@/lib/workspace/schema";
+import { searchPage, SEARCH_PAGE_SIZE, type SearchFilters } from "@/lib/workspace/search";
 import { PaperCard, type Paper } from "./paper-card";
+export type { SearchFilters } from "@/lib/workspace/search";
 
-/**
- * Providers aligned to the academic orchestrator. The three default sources
- * (Crossref, arXiv, Europe PMC) operate without API keys; the rest require a
- * configured server credential and are shown but disabled in local mode.
- */
 export const AVAILABLE_PROVIDERS = [
-  { id: "Crossref", label: "Crossref", scope: "DOI Registry", needsKey: false },
-  { id: "arXiv", label: "arXiv", scope: "Preprints", needsKey: false },
-  { id: "Europe PMC", label: "Europe PMC", scope: "Open Access", needsKey: false },
-  { id: "OpenAlex", label: "OpenAlex", scope: "Global Index", needsKey: true },
-  { id: "Semantic Scholar", label: "Semantic Scholar", scope: "Citation Graph", needsKey: true },
-  { id: "IEEE Xplore", label: "IEEE Xplore", scope: "Applied Tech", needsKey: true },
-  { id: "CORE", label: "CORE", scope: "Open Repositories", needsKey: true },
+  { id: "Crossref", label: "Crossref", needsKey: false },
+  { id: "arXiv", label: "arXiv", needsKey: false },
+  { id: "Europe PMC", label: "Europe PMC", needsKey: false },
+  { id: "OpenAlex", label: "OpenAlex", needsKey: true },
+  { id: "Semantic Scholar", label: "Semantic Scholar", needsKey: true },
+  { id: "IEEE Xplore", label: "IEEE Xplore", needsKey: true },
+  { id: "CORE", label: "CORE", needsKey: true },
 ] as const;
-
-export interface SearchFilters {
-  yearFrom?: number;
-  yearTo?: number;
-  openAccess?: boolean;
-  minCitations?: number;
-  sort?: "relevance" | "year" | "citations";
-}
 
 interface DiscoverViewProps {
   query: string;
-  setQuery: (q: string) => void;
+  setQuery: (query: string) => void;
   selectedProviders: string[];
-  setSelectedProviders: (p: string[]) => void;
+  setSelectedProviders: (providers: string[]) => void;
   filters: SearchFilters;
-  setFilters: (f: SearchFilters) => void;
-  onSearch: (q: string) => void;
+  setFilters: (filters: SearchFilters) => void;
+  onSearch: (query: string) => void;
   isSearching: boolean;
+  hasSearched: boolean;
+  resultsQuery: string;
+  error: string;
   results: Paper[];
+  pageIndex: number;
+  onPageChange: (index: number) => void;
+  configuredProviders: Record<string, boolean>;
   diagnostics?: Array<{ source: string; status?: string; error?: string; durationMs: number }>;
   recentSearches: Workspace["searches"];
+  onRestoreSearch: (search: Workspace["searches"][number]) => void;
   savedPaperIds: Set<string>;
   comparedPaperIds: Set<string>;
   onToggleSave: (paper: Paper) => void;
@@ -63,495 +44,177 @@ interface DiscoverViewProps {
   onAddToProject?: (paper: Paper) => void;
 }
 
-const SUGGESTED_TOPICS = [
-  { title: "Temporal Graph Neural Networks", query: "temporal graph neural networks dynamic graph representation learning", tag: "Graph Intelligence" },
-  { title: "Retrieval-Augmented Generation", query: "retrieval augmented generation hallucination mitigation factuality", tag: "Language Models" },
-  { title: "Diffusion Models for Structural Biology", query: "diffusion models protein structure prediction conformation dynamics", tag: "Biomedical AI" },
-  { title: "Quantum Error Correction", query: "quantum error correction surface codes fault tolerant threshold", tag: "Quantum Computing" },
+const TOPICS = [
+  { label: "Retrieval-augmented generation", query: "retrieval augmented generation hallucination mitigation factuality", area: "Language models" },
+  { label: "Temporal graph neural networks", query: "temporal graph neural networks dynamic graph representation learning", area: "Graph learning" },
+  { label: "Protein structure prediction", query: "diffusion models protein structure prediction conformation dynamics", area: "Biology" },
+  { label: "Quantum error correction", query: "quantum error correction surface codes fault tolerant threshold", area: "Quantum computing" },
 ];
 
-/** Shuffling paper-stack loading state */
-function StackLoader({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-5 py-10">
-      <div className="relative h-16 w-14">
-        <span className="stack-sheet" />
-        <span className="stack-sheet" />
-        <span className="stack-sheet" />
-      </div>
-      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--ink-muted)] caret">
-        {label}
-      </p>
-    </div>
-  );
-}
+export function DiscoverView(props: DiscoverViewProps) {
+  const { query, setQuery, filters, setFilters, selectedProviders, setSelectedProviders,
+    onSearch, isSearching, hasSearched, resultsQuery, error, results, pageIndex, onPageChange,
+    diagnostics = [], recentSearches, onRestoreSearch, configuredProviders } = props;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLElement>(null);
+  const pagination = searchPage(results, pageIndex);
+  const activeFilters = [filters.yearFrom, filters.yearTo, filters.minCitations, filters.openAccess || undefined].filter(v => v !== undefined).length;
+  const responded = diagnostics.filter(s => ["success", "empty", "partial"].includes(s.status ?? "")).length;
 
-export function DiscoverView({
-  query,
-  setQuery,
-  selectedProviders,
-  setSelectedProviders,
-  filters,
-  setFilters,
-  onSearch,
-  isSearching,
-  results,
-  diagnostics,
-  recentSearches,
-  savedPaperIds,
-  comparedPaperIds,
-  onToggleSave,
-  onToggleCompare,
-  onOpenReader,
-  onAddToProject,
-}: DiscoverViewProps) {
-  const [showFilters, setShowFilters] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Press "/" anywhere (outside a field) to jump into the search bar.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "/") return;
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT" ||
-          target.isContentEditable)
-      )
-        return;
-      e.preventDefault();
-      searchInputRef.current?.focus();
+    const focusSearch = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.key === "/" && !target?.closest("input, textarea, select, [contenteditable=true]")) {
+        event.preventDefault();
+        inputRef.current?.focus();
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
   }, []);
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (query.trim()) onSearch(query.trim());
-  };
-
-  const toggleProvider = (id: string, disabled: boolean) => {
-    if (disabled) return;
+  function submit(event: FormEvent) { event.preventDefault(); onSearch(query); }
+  function changePage(index: number) {
+    onPageChange(index);
+    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function toggleSource(id: string) {
     if (selectedProviders.includes(id)) {
-      if (selectedProviders.length > 1) {
-        setSelectedProviders(selectedProviders.filter((p) => p !== id));
-      }
-    } else {
-      setSelectedProviders([...selectedProviders, id]);
-    }
-  };
-
-  const hasResults = results.length > 0;
-  const hasSearched = isSearching || hasResults || (diagnostics && diagnostics.length > 0);
+      if (selectedProviders.length > 1) setSelectedProviders(selectedProviders.filter(source => source !== id));
+    } else setSelectedProviders([...selectedProviders, id]);
+  }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-      {/* ============ LEFT RAIL (widescreen) ============ */}
-      <aside className="hidden xl:block xl:col-span-3 space-y-6 sticky top-8">
-        {/* Providers */}
-        <section className="bench-card p-4 space-y-3.5">
-          <div className="flex items-center justify-between">
-            <h3 className="stamp-label">
-              <Database className="w-3.5 h-3.5 text-[var(--cyan-ink)]" strokeWidth={2.2} />
-              <span className="stamp-underline">Repositories</span>
-            </h3>
-          </div>
-          <div className="space-y-1.5">
-            {AVAILABLE_PROVIDERS.map((p) => {
-              const active = selectedProviders.includes(p.id);
-              const disabled = p.needsKey;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => toggleProvider(p.id, disabled)}
-                  disabled={disabled}
-                  className={`w-full flex items-center justify-between border-2 rounded-[var(--radius-cut)] px-2.5 py-2 text-left transition-all ${
-                    disabled
-                      ? "border-[var(--border-soft)] hatch-row cursor-not-allowed"
-                      : active
-                        ? "border-[var(--ink-heading)] bg-[var(--cyan-wash)] shadow-[2px_2px_0_rgba(101,123,131,0.2)]"
-                        : "border-transparent hover:border-[var(--border-soft)] hover:bg-[var(--bg-paper-dim)]"
-                  }`}
-                  aria-pressed={active}
-                  title={disabled ? "Key-gated — configure the server credential to enable" : undefined}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span
-                      className={`h-3 w-3 border-2 rounded-[1px] flex items-center justify-center shrink-0 ${
-                        active ? "border-[var(--ink-heading)] bg-[var(--cyan)]" : "border-[var(--border-ink)]"
-                      }`}
-                    >
-                      {active && <CheckCircle2 className="h-2.5 w-2.5 text-[var(--on-cyan)]" strokeWidth={3.5} />}
-                    </span>
-                    <div className="min-w-0">
-                      <div className={`text-[13px] font-bold leading-tight truncate ${disabled ? "text-[var(--ink-body)]" : ""}`}>{p.label}</div>
-                      <div className="font-mono text-[9.5px] uppercase tracking-wider text-[var(--ink-muted)]">{p.scope}</div>
-                    </div>
-                  </div>
-                  {disabled && <KeyRound className="w-3.5 h-3.5 text-[var(--yellow-ink)] shrink-0" strokeWidth={2.2} />}
-                </button>
-              );
-            })}
-          </div>
-          <p className="font-mono text-[9.5px] leading-relaxed text-[var(--ink-muted)] uppercase tracking-wider border-t-2 border-dotted border-[var(--border-soft)] pt-2.5">
-            Three repositories run key-free. Key-gated sources stay locked in local mode.
-          </p>
-        </section>
+    <div className="discover-page">
+      <header className="discovery-heading">
+        <p className="section-kicker">Discover</p>
+        <h1>Good research starts<br className="hidden sm:block" /> with a <span>better source.</span></h1>
+        <p>Find papers across trusted scholarly sources. Save what matters, then follow the evidence.</p>
+      </header>
 
-        {/* Recent searches */}
-        {recentSearches.length > 0 && (
-          <section className="bench-card p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="stamp-label">
-                <History className="w-3.5 h-3.5 text-[var(--cyan-ink)]" strokeWidth={2.2} />
-                <span className="stamp-underline">Recent</span>
-              </h3>
-            </div>
-            <div className="bench-scroll space-y-1 max-h-72 overflow-y-auto pr-1">
-              {recentSearches.slice(0, 8).map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => {
-                    setQuery(s.query);
-                    onSearch(s.query);
-                  }}
-                  className="w-full text-left border-2 border-transparent rounded-[var(--radius-cut)] px-2.5 py-2 hover:border-[var(--border-soft)] hover:bg-[var(--bg-paper-dim)] transition-colors"
-                >
-                  <div className="text-[12.5px] leading-snug line-clamp-2">{s.query}</div>
-                  <div className="font-mono text-[9.5px] text-[var(--ink-muted)] mt-1 flex items-center gap-2 uppercase tracking-wider">
-                    <span>{(s.papers || []).length} records</span>
-                    <span>·</span>
-                    <span>{new Date(s.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-      </aside>
-
-      {/* ============ MAIN COLUMN ============ */}
-      <div className="xl:col-span-9 space-y-7">
-        {/* ================= HERO ================= */}
-        {!hasSearched ? (
-          <section className="space-y-5 animate-rise">
-            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--cyan-ink)] flex items-center gap-2.5">
-              <span className="live-dot" aria-hidden="true" />
-              Crossref · arXiv · Europe PMC — live, key-free
-            </p>
-            <h1 className="font-display font-extrabold text-[2.6rem] sm:text-6xl leading-[0.98] max-w-3xl">
-              The research desk that keeps its <span className="marker">receipts.</span>
-            </h1>
-            <p className="text-base sm:text-lg text-[var(--ink-body)] max-w-2xl leading-relaxed">
-              Search real scholarly records, keep every passage verbatim, screen papers
-              against your protocol, and walk into your review with an evidence matrix
-              that holds up. No black boxes — every claim traces to a line you can point at.
-            </p>
-          </section>
-        ) : (
-          /* Compact header once searching */
-          <div className="space-y-3 animate-rise">
-            <div className="flex items-center gap-3">
-              <span className="stamp-label">
-                <span className="stamp-num">01</span> / Discover
-              </span>
-              <span className="h-0.5 flex-1 bg-[var(--border-soft)]" />
-              <span className="ticket ticket-cyan">
-                <span>{selectedProviders.length} repositories</span>
-              </span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold font-display">
-              Find the literature that matters.
-            </h1>
-          </div>
-        )}
-
-        {/* Search bar */}
-        <form onSubmit={handleSubmit} className="search-bar p-2 sm:p-2.5 flex items-center gap-2 animate-rise">
-          <div className="pl-3 text-[var(--cyan-ink)]">
-            <Search className="w-5 h-5" strokeWidth={2.4} />
-          </div>
-          <input
-            ref={searchInputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search a topic, phrase, DOI, or arXiv ID… (press / to focus)"
-            className="flex-1 min-w-0 bg-transparent border-0 outline-none placeholder:text-[var(--ink-faint)] text-base sm:text-lg py-2.5"
-            aria-label="Search query"
-          />
-          <button
-            type="button"
-            onClick={() => setShowFilters((v) => !v)}
-            className={`btn btn-chip font-mono text-[11px] uppercase tracking-wider ${showFilters ? "btn-ink" : "btn-ghost"}`}
-            aria-expanded={showFilters}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Filters</span>
-          </button>
-          <button
-            type="submit"
-            disabled={isSearching || !query.trim()}
-            className="btn btn-primary h-11 px-5 sm:px-7 text-sm font-mono uppercase tracking-wider"
-          >
-            {isSearching ? "Searching" : "Search"}
-            {!isSearching && <ArrowRight className="w-4 h-4" strokeWidth={2.6} />}
+      <section className="search-workbench" aria-label="Search scholarly papers">
+        <form onSubmit={submit} className="discovery-search">
+          <Search size={22} aria-hidden="true" />
+          <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)}
+            placeholder="Search a topic, title, DOI, or arXiv ID"
+            aria-label="Search query" aria-describedby={error ? "search-error" : "search-help"}
+            maxLength={1000} />
+          <button type="submit" className="btn btn-primary search-submit" disabled={isSearching || !query.trim()}>
+            {isSearching ? "Searching…" : "Search papers"} <ArrowRight size={17} aria-hidden="true" />
           </button>
         </form>
-
-        {/* Mobile provider chips */}
-        <div className="xl:hidden flex flex-wrap gap-1.5">
-          {AVAILABLE_PROVIDERS.map((p) => {
-            const active = selectedProviders.includes(p.id);
-            const disabled = p.needsKey;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => toggleProvider(p.id, disabled)}
-                disabled={disabled}
-                className={`tab-pill ${active ? "!bg-[var(--cyan)] !border-[var(--ink-heading)] !text-[var(--on-cyan)]" : ""} ${disabled ? "hatch-row !border-[var(--border-soft)] !text-[var(--ink-muted)] cursor-not-allowed" : ""}`}
-                aria-pressed={active}
-                title={disabled ? "Key-gated — configure the server credential to enable" : undefined}
-              >
-                {p.label}
-                {disabled && <KeyRound className="w-3 h-3 text-[var(--yellow-ink)]" strokeWidth={2.2} />}
-              </button>
-            );
-          })}
+        <div className="search-controls">
+          <p id="search-help">Search the literature. <kbd>/</kbd> to focus.</p>
+          <details className="filter-disclosure">
+            <summary><SlidersHorizontal size={15} /> Filters {activeFilters > 0 && <span>{activeFilters}</span>}<ChevronDown size={14} /></summary>
+            <div className="search-filter-fields">
+              <label>Year from<input type="number" min={1800} max={2100} className="field-input"
+                value={filters.yearFrom ?? ""} onChange={e => setFilters({ ...filters, yearFrom: e.target.value === "" ? undefined : Number(e.target.value) })} /></label>
+              <label>Year to<input type="number" min={1800} max={2100} className="field-input"
+                value={filters.yearTo ?? ""} onChange={e => setFilters({ ...filters, yearTo: e.target.value === "" ? undefined : Number(e.target.value) })} /></label>
+              <label>Minimum citations<input type="number" min={0} max={10000000} className="field-input"
+                value={filters.minCitations ?? ""} onChange={e => setFilters({ ...filters, minCitations: e.target.value === "" ? undefined : Number(e.target.value) })} /></label>
+              <label className="filter-check"><input type="checkbox" checked={filters.openAccess ?? false}
+                onChange={e => setFilters({ ...filters, openAccess: e.target.checked })} /> Open access only</label>
+              <p>Filters apply when you search. Records missing the required metadata are excluded.</p>
+              {activeFilters > 0 && <button type="button" className="text-action" onClick={() => setFilters({ sort: filters.sort })}>Clear filters</button>}
+            </div>
+          </details>
         </div>
+        <div className="search-sources" aria-label="Research sources">
+          <span>Search in</span>
+          {AVAILABLE_PROVIDERS.filter(provider => configuredProviders[provider.id]).map(provider => (
+            <button type="button" key={provider.id} onClick={() => toggleSource(provider.id)}
+              className={"source-choice " + (selectedProviders.includes(provider.id) ? "is-selected" : "")}
+              aria-pressed={selectedProviders.includes(provider.id)}>
+              {selectedProviders.includes(provider.id) && <Check size={13} aria-hidden="true" />} {provider.label}
+            </button>
+          ))}
+          <details className="extra-sources">
+            <summary>More sources <ChevronDown size={13} /></summary>
+            <div>{AVAILABLE_PROVIDERS.filter(provider => !configuredProviders[provider.id]).map(provider => (
+              <span key={provider.id}>{provider.label}<small>Requires server configuration</small></span>
+            ))}
+            <a href="https://github.com/Pratham2511/Kivo-Research-Discovery-Workspace#configuration" target="_blank" rel="noopener noreferrer">Source setup <ExternalLink size={12} /></a></div>
+          </details>
+        </div>
+        {error && <div id="search-error" role="alert" className="inline-error"><AlertCircle size={18} /><p>{error}</p></div>}
+      </section>
 
-        {/* Filters panel */}
-        {showFilters && (
-          <section className="bench-card p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 animate-rise">
-            <label className="flex flex-col gap-1.5">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">Year from</span>
-              <input
-                type="number"
-                value={filters.yearFrom ?? ""}
-                onChange={(e) => setFilters({ ...filters, yearFrom: e.target.value ? Number(e.target.value) : undefined })}
-                placeholder="1990"
-                className="field-input"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">Year to</span>
-              <input
-                type="number"
-                value={filters.yearTo ?? ""}
-                onChange={(e) => setFilters({ ...filters, yearTo: e.target.value ? Number(e.target.value) : undefined })}
-                placeholder="2025"
-                className="field-input"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">Min citations</span>
-              <input
-                type="number"
-                value={filters.minCitations ?? ""}
-                onChange={(e) => setFilters({ ...filters, minCitations: e.target.value ? Number(e.target.value) : undefined })}
-                placeholder="0"
-                className="field-input"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">Sort by</span>
-              <select
-                value={filters.sort ?? "relevance"}
-                onChange={(e) => setFilters({ ...filters, sort: e.target.value as SearchFilters["sort"] })}
-                className="field-input"
-              >
-                <option value="relevance">Relevance</option>
-                <option value="year">Newest first</option>
-                <option value="citations">Most cited</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2.5 col-span-2 sm:col-span-4 cursor-pointer border-t-2 border-dotted border-[var(--border-soft)] pt-3.5">
-              <input
-                type="checkbox"
-                checked={filters.openAccess ?? false}
-                onChange={(e) => setFilters({ ...filters, openAccess: e.target.checked })}
-                className="h-4 w-4 accent-[var(--cyan)]"
-              />
-              <span className="text-sm font-bold">Open access only</span>
-            </label>
+      {isSearching && <div className="search-loading" role="status" aria-live="polite">
+        <div className="search-loading-lines"><span /><span /><span /></div>
+        <div><strong>Searching your sources</strong><p>Retrieving papers, removing duplicates, and checking your filters.</p></div>
+      </div>}
+
+      {!hasSearched && !isSearching && (
+        <div className="discover-start">
+          <section className="topic-section">
+            <h2>Start with a line of inquiry</h2>
+            <div className="topic-grid">{TOPICS.map(topic => (
+              <button type="button" key={topic.query} onClick={() => { setQuery(topic.query); onSearch(topic.query); }}>
+                <small>{topic.area}</small><span>{topic.label}</span><ArrowRight size={18} />
+              </button>
+            ))}</div>
           </section>
-        )}
+          <aside className="workflow-guide">
+            <span className="section-kicker">Your next steps</span>
+            <ol>
+              <li><span>1</span><div><strong>Find a paper</strong><p>Search by topic or paste a DOI.</p></div></li>
+              <li><span>2</span><div><strong>Keep the useful ones</strong><p>Save papers to your library.</p></div></li>
+              <li><span>3</span><div><strong>Read. Capture. Connect.</strong><p>Keep quotes with their sources, then build your review.</p></div></li>
+            </ol>
+            <p className="local-note">Your research stays in this browser. Back it up from the sidebar.</p>
+          </aside>
+        </div>
+      )}
 
-        {/* Suggested topics (when no search yet) */}
-        {!hasSearched && (
-          <section className="space-y-3 animate-rise">
-            <h3 className="stamp-label">
-              <Zap className="w-3.5 h-3.5 text-[var(--yellow-ink)]" strokeWidth={2.4} />
-              <span className="stamp-underline">Lines of inquiry to try</span>
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {SUGGESTED_TOPICS.map((t) => (
-                <button
-                  key={t.title}
-                  type="button"
-                  onClick={() => {
-                    setQuery(t.query);
-                    onSearch(t.query);
-                  }}
-                  className="bench-card bench-card-lift text-left p-5 group"
-                >
-                  <div className="ticket ticket-violet mb-3">
-                    <span>{t.tag}</span>
-                  </div>
-                  <div className="text-base font-bold font-display leading-snug group-hover:text-[var(--cyan-ink)] transition-colors">
-                    {t.title}
-                  </div>
-                  <div className="mt-3 flex items-center gap-1.5 font-mono text-[10.5px] font-bold uppercase tracking-wider text-[var(--ink-muted)] group-hover:text-[var(--cyan-ink)] transition-colors">
-                    <span>Run search</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Searching state */}
-        {isSearching && (
-          <div className="bench-card p-8 flex flex-col items-center gap-3">
-            <StackLoader label="Querying scholarly repositories" />
-            <p className="font-mono text-[10px] text-[var(--ink-muted)] uppercase tracking-[0.18em]">
-              Retrieving · Deduplicating · Ranking
-            </p>
+      {hasSearched && (
+        <section ref={resultsRef} className="search-results" aria-label="Search results" aria-busy={isSearching}>
+          <div className="results-heading">
+            <div><h2>{results.length === 0 ? "No matching papers" : "Search results"}</h2>
+              <p>{results.length.toLocaleString()} {results.length === 1 ? "paper" : "papers"} in this snapshot for <strong>“{resultsQuery}”</strong></p></div>
+            <label className="results-sort">Sort by<select className="field-input" aria-label="Sort results" value={filters.sort ?? "relevance"}
+              onChange={e => setFilters({ ...filters, sort: e.target.value as SearchFilters["sort"] })}>
+              <option value="relevance">Best match</option><option value="year">Newest first</option><option value="citations">Most cited</option>
+            </select></label>
           </div>
-        )}
+          {diagnostics.length > 0 && <details className="source-telemetry">
+            <summary>{responded} of {diagnostics.length} sources responded <ChevronDown size={14} /></summary>
+            <div>{diagnostics.map(source => <p key={source.source}>
+              <strong>{source.source}</strong><span>{source.status === "success" ? "Available" : source.status === "empty" ? "No matches" : source.status}</span>
+              {source.error && <small>{source.error}</small>}
+            </p>)}</div>
+          </details>}
+          {results.length > 0 ? <>
+            <div className="results-pagebar">
+              <div className="results-range" aria-live="polite">Showing {pagination.page * SEARCH_PAGE_SIZE + 1}–{Math.min((pagination.page + 1) * SEARCH_PAGE_SIZE, results.length)} of {results.length}</div>
+              {pagination.pages > 1 && <nav aria-label="Quick result page navigation">
+                <button type="button" className="btn btn-ghost" aria-label="Go to previous results page" disabled={pagination.page === 0} onClick={() => changePage(pagination.page - 1)}><ArrowLeft size={14} /></button>
+                <span>{pagination.page + 1} / {pagination.pages}</span>
+                <button type="button" className="btn btn-ghost" aria-label="Go to next results page" disabled={pagination.page === pagination.pages - 1} onClick={() => changePage(pagination.page + 1)}><ArrowRight size={14} /></button>
+              </nav>}
+            </div>
+            <div className="paper-list">{pagination.papers.map(paper => <PaperCard key={paper.id} paper={paper}
+              isSaved={props.savedPaperIds.has(paper.id)} isCompared={props.comparedPaperIds.has(paper.id)}
+              onToggleSave={props.onToggleSave} onToggleCompare={props.onToggleCompare}
+              onOpenReader={props.onOpenReader} onAddToProject={props.onAddToProject} />)}</div>
+            {pagination.pages > 1 && <nav className="results-pagination" aria-label="Search result pages">
+              <button type="button" className="btn btn-ghost" disabled={pagination.page === 0} onClick={() => changePage(pagination.page - 1)}><ArrowLeft size={16} /> Previous</button>
+              <span>Page <strong>{pagination.page + 1}</strong> of {pagination.pages}</span>
+              <button type="button" className="btn btn-primary" disabled={pagination.page === pagination.pages - 1} onClick={() => changePage(pagination.page + 1)}>Next page <ArrowRight size={16} /></button>
+            </nav>}
+          </> : <div className="search-empty"><Search size={30} /><p>Try a broader phrase, another source, or fewer filters.</p>
+            <button type="button" className="btn btn-ghost" onClick={() => { setFilters({ sort: "relevance" }); inputRef.current?.focus(); }}>Adjust your search</button></div>}
+          <p className="snapshot-note">Up to 50 records per source, deduplicated into a bounded snapshot. This is a starting set, not a count of all published literature.</p>
+        </section>
+      )}
 
-        {/* Diagnostics */}
-        {!isSearching && diagnostics && diagnostics.length > 0 && (
-          <section className="space-y-2.5">
-            <div className="flex items-center gap-2.5">
-              <h3 className="stamp-label">
-                <span className="stamp-underline">Source telemetry</span>
-              </h3>
-              <span className="h-0.5 flex-1 bg-[var(--border-soft)]" />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {diagnostics.map((d) => {
-                const ok = d.status === "success" || d.status === "empty";
-                const partial = d.status === "partial";
-                const unconfigured = d.status === "unconfigured";
-                return (
-                  <div
-                    key={d.source}
-                    className={`bench-card !shadow-none p-3 flex items-start gap-2.5 ${
-                      ok ? "!border-[var(--green)]" : unconfigured ? "opacity-60" : "!border-[var(--red)]"
-                    }`}
-                  >
-                    {ok ? <CheckCircle2 className="w-4 h-4 text-[var(--green-ink)] mt-0.5 shrink-0" strokeWidth={2.4} />
-                      : unconfigured ? <KeyRound className="w-4 h-4 text-[var(--ink-faint)] mt-0.5 shrink-0" />
-                      : partial ? <AlertTriangle className="w-4 h-4 text-[var(--orange-ink)] mt-0.5 shrink-0" strokeWidth={2.4} />
-                        : <XCircle className="w-4 h-4 text-[var(--red-ink)] mt-0.5 shrink-0" strokeWidth={2.4} />}
-                    <div className="min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13px] font-bold">{d.source}</span>
-                        <span className="font-mono text-[10px] text-[var(--ink-muted)]">{d.durationMs}ms</span>
-                      </div>
-                      <div className="font-mono text-[9.5px] text-[var(--ink-muted)] uppercase tracking-wider mt-0.5">
-                        {d.status ?? "—"}
-                      </div>
-                      {d.error && <div className="text-[11px] text-[var(--ink-muted)] mt-1 line-clamp-2">{d.error}</div>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Results summary strip */}
-        {!isSearching && hasResults && diagnostics && diagnostics.length > 0 && (
-          <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="stat-cell">
-              <span className="stat-label">Records</span>
-              <span className="stat-value">{results.length}</span>
-              <span className="stat-sub">in this snapshot</span>
-            </div>
-            <div className="stat-cell tone-green">
-              <span className="stat-label">Sources live</span>
-              <span className="stat-value text-[var(--green-ink)]">
-                {diagnostics?.filter((d) => d.status === "success").length ?? 0}
-                <span className="text-base font-bold text-[var(--ink-faint)]">/{diagnostics?.length ?? 0}</span>
-              </span>
-              <span className="stat-sub">responded successfully</span>
-            </div>
-            <div className="stat-cell tone-yellow">
-              <span className="stat-label">Open access</span>
-              <span className="stat-value">{results.filter((r) => r.openAccess).length}</span>
-              <span className="stat-sub">immediately reachable</span>
-            </div>
-            <div className="stat-cell tone-violet">
-              <span className="stat-label">With PDF</span>
-              <span className="stat-value">{results.filter((r) => r.pdfLink || r.identifiers?.arxiv).length}</span>
-              <span className="stat-sub">direct full-text</span>
-            </div>
-          </section>
-        )}
-
-        {/* Results list */}
-        {!isSearching && hasResults && (
-          <section className="space-y-4">
-            <div className="flex items-baseline justify-between gap-3">
-              <h3 className="stamp-label">
-                <BookOpen className="w-3.5 h-3.5 text-[var(--cyan-ink)]" strokeWidth={2.2} />
-                <span className="stamp-underline">Results</span>
-              </h3>
-              <span className="font-mono text-[10.5px] font-bold tracking-wider text-[var(--ink-muted)] uppercase">
-                Showing {results.length} {results.length === 1 ? "record" : "records"}
-              </span>
-            </div>
-            <div className="space-y-4">
-              {results.map((paper) => (
-                <PaperCard
-                  key={paper.id}
-                  paper={paper}
-                  isSaved={savedPaperIds.has(paper.id)}
-                  isCompared={comparedPaperIds.has(paper.id)}
-                  onToggleSave={onToggleSave}
-                  onToggleCompare={onToggleCompare}
-                  onOpenReader={onOpenReader}
-                  onAddToProject={onAddToProject}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Empty after search */}
-        {!isSearching && hasSearched && !hasResults && (
-          <div className="bench-card p-12 text-center space-y-4 max-w-xl mx-auto">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center border-2 border-[var(--border-ink)] rounded-[var(--radius-cut)] bg-[var(--cyan-wash)] text-[var(--cyan-ink)] hatch">
-              <Compass className="h-7 w-7" strokeWidth={2.2} />
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-xl font-extrabold font-display">No records returned</h3>
-              <p className="text-sm text-[var(--ink-body)] leading-relaxed">
-                Every selected source returned an empty or failed snapshot. Try a broader
-                phrase, different repositories, or relax the filters.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Provenance footer note */}
-        {!isSearching && hasResults && (
-          <p className="flex items-start gap-2 font-mono text-[10px] text-[var(--ink-muted)] leading-relaxed max-w-3xl uppercase tracking-wider border-t-2 border-dotted border-[var(--border-soft)] pt-3">
-            <ShieldCheck className="w-3.5 h-3.5 text-[var(--green-ink)] shrink-0 mt-0.5" strokeWidth={2.2} />
-            Bounded snapshot of up to 50 relevance-ordered records per source, deduplicated
-            and filtered locally. Counts are not global literature totals. Missing metadata
-            cannot satisfy a hard filter.
-          </p>
-        )}
-      </div>
+      {recentSearches.length > 0 && <section className="recent-searches" aria-label="Recent searches">
+        <h2><History size={17} /> Pick up a recent search</h2>
+        <div>{recentSearches.slice(0, 4).map(search => <button key={search.id} type="button" onClick={() => onRestoreSearch(search)}>
+          <span>{search.query}</span><small>{search.papers.length} {search.papers.length === 1 ? "paper" : "papers"}</small><ArrowRight size={15} />
+        </button>)}</div>
+      </section>}
     </div>
   );
 }

@@ -1,13 +1,10 @@
 import { emptyWorkspace, type Workspace } from "./schema";
-import { normalizeWorkspace } from "./repository";
+import { normalizeWorkspace, decodeCacheSnapshot } from "./repository";
+import { nextSaveTime, observeSaveTime } from "./storage-snapshot";
 
 const STORAGE_KEY = "kivo_workspace_cache_v1";
 
-/**
- * Bulletproof Browser Cache & Local Storage Engine
- * Provides instant synchronous reads and writes so saved papers, search history,
- * comparison tray, and projects persist 100% reliably even when the database is offline.
- */
+/** Best-effort cache and in-memory copy. IndexedDB stores larger workspaces. */
 export class LocalStorageEngine {
   private inMemoryWorkspace: Workspace;
 
@@ -27,25 +24,28 @@ export class LocalStorageEngine {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        return normalizeWorkspace(parsed);
+        const snapshot = decodeCacheSnapshot(parsed);
+        if (snapshot) observeSaveTime(snapshot.savedAt);
+        this.inMemoryWorkspace = snapshot?.state ?? normalizeWorkspace(parsed);
+        return this.inMemoryWorkspace;
       }
     } catch (e) {
       console.warn("Could not read from localStorage, using memory", e);
     }
-    return emptyWorkspace();
+    return this.inMemoryWorkspace;
   }
 
   /**
    * Synchronous save to localStorage + memory
    */
-  public saveSync(workspace: Workspace): boolean {
+  public saveSync(workspace: Workspace, savedAt = nextSaveTime()): boolean {
     this.inMemoryWorkspace = workspace;
     if (typeof window === "undefined") return false;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: workspace, savedAt }));
       return true;
     } catch (e) {
-      console.warn("Could not save to localStorage, cached in memory only", e);
+      // The caller checks this result; IndexedDB may already have saved it.
       return false;
     }
   }

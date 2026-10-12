@@ -28,8 +28,8 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   return (
     <button
       type="button"
-      aria-label={isDark ? "Switch to Solarized Light" : "Switch to Solarized Dark"}
-      title={isDark ? "Solarized Light" : "Solarized Dark"}
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      title={isDark ? "Light theme" : "Dark theme"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className="btn btn-ghost btn-chip !px-2.5"
     >
@@ -44,7 +44,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
       )}
       {!compact && (
         <span className="font-mono text-[11px] uppercase tracking-wider">
-          {mounted ? (isDark ? "Harbour" : "Paper") : "Theme"}
+          {mounted ? (isDark ? "Light theme" : "Dark theme") : "Theme"}
         </span>
       )}
     </button>

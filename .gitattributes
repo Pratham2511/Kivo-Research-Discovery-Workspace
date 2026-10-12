@@ -1,0 +1,5 @@
+# Keep binary assets intact, including the PDF fixture's byte offsets.
+*.pdf binary
+*.jpg binary
+*.png binary
+*.mp4 binary

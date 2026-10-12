@@ -59,3 +59,10 @@ Caddyfile
 start.sh
 local-*
 prompt
+
+# Private/local research and agent audit material; publish selected screenshots only.
+/docs/qa/
+/docs/PROJECT-UNDERSTANDING.md
+/AGENTS.md
+/CLAUDE.md
+/public/kivo-media/light-orb.mp4

@@ -190,7 +190,7 @@ export function CompareView({
                             }`}
                           >
                             {access.hasDirectPdf && <FileText className="w-3 h-3" strokeWidth={2.2} />}
-                            <span>PDF</span>
+                            <span>{access.hasDirectPdf ? "PDF" : "Source"}</span>
                             <ExternalLink className="w-2.5 h-2.5 opacity-70" strokeWidth={2.4} />
                           </a>
                         )}

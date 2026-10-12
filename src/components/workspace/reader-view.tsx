@@ -127,19 +127,6 @@ export function ReaderView({
     [document],
   );
 
-  // Reset all per-paper state when the reader switches papers.
-  useEffect(() => {
-    setActivePage(1);
-    setTextInput("");
-    setEvidenceKind("author passage");
-    setCaptureSource("abstract");
-    setCaptureMessage(null);
-    setExtractMessage(null);
-    setConfirmRemoveDoc(false);
-    setFocusSession(false);
-    setSessionCaptures(0);
-  }, [paper.id]);
-
   const currentPage = useMemo(
     () => document?.pages.find((p) => p.page === activePage) ?? null,
     [document, activePage],
@@ -204,30 +191,19 @@ export function ReaderView({
     setIsExtracting(true);
     setExtractMessage(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch("/api/extract", { method: "POST", body });
-      const data = await res.json();
-      if (!res.ok || !Array.isArray(data.pages)) {
-        setExtractMessage({
-          type: "error",
-          text:
-            typeof data?.error === "string"
-              ? data.error
-              : "Text extraction failed. Try another file.",
-        });
-        return;
-      }
+      const { extractBrowserPdf } = await import("@/lib/workspace/pdf-browser");
+      const data = await extractBrowserPdf(file);
       const ok = await onAttachDocument(paper, {
         name: typeof data.name === "string" ? data.name : file.name,
         hash: data.hash,
         pages: data.pages,
       });
       if (ok) {
+        const pageCount = data.pages.length + (data.pages.length === 1 ? " page" : " pages");
         setActivePage(1);
         setExtractMessage({
           type: "success",
-          text: `Extracted ${data.pages.length} ${data.pages.length === 1 ? "page" : "pages"}. Highlight any passage — it anchors to the page it came from.`,
+          text: data.truncated ? "Extracted " + pageCount + ". Long pages or pages beyond 500 were clipped; only the displayed text is available for evidence." : "Extracted " + pageCount + " in your browser. Highlight a passage to capture its page number.",
         });
       } else {
         setExtractMessage({
@@ -235,10 +211,10 @@ export function ReaderView({
           text: "The document could not be stored in this workspace.",
         });
       }
-    } catch {
+    } catch (cause) {
       setExtractMessage({
         type: "error",
-        text: "Upload failed — the extraction service could not be reached.",
+        text: cause instanceof Error ? cause.message : "This PDF could not be read. Try another file.",
       });
     } finally {
       setIsExtracting(false);
@@ -546,7 +522,7 @@ export function ReaderView({
                       {isExtracting ? "Extracting pages…" : "Drop the paper's PDF here"}
                     </p>
                     <p className="font-mono text-[9.5px] text-[var(--ink-muted)] uppercase tracking-wider leading-relaxed">
-                      Or click to browse · PDF ≤ 15 MB · text extracted per page, stored locally
+                      Or click to browse · PDF ≤ 15 MB · processed in your browser, saved locally
                     </p>
                   </div>
                 </div>

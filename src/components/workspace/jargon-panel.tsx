@@ -77,13 +77,8 @@ export function JargonPanel({ paper }: { paper: Paper }) {
   );
   const rewriteStats = useMemo(
     () => (gloss?.rewrite ? readability(gloss.rewrite) : null),
-    [gloss?.rewrite],
+    [gloss],
   );
-
-  // Reset when the paper changes underneath the reader.
-  useEffect(() => {
-    setGloss(null);
-  }, [paper.id]);
 
   if (!paper.abstract) return null;
 
