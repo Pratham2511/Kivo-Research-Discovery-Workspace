@@ -9,7 +9,7 @@
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --import ./scripts/register-tests.mjs scripts/research-flows.test.mjs"
+    "test": "node --import ./scripts/register-tests.mjs scripts/run-tests.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { llmComplete, llmStatus, type LlmMessage } from "@/lib/llm";
+import { requestLlmConfig, LlmError, llmComplete, llmStatus, type LlmMessage } from "@/lib/llm";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * POST /api/gloss — plain-language rewrite of one abstract (FUTURE_FEATURES #11).
@@ -80,7 +81,8 @@ function verify(
   };
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
+  const config = requestLlmConfig(req.headers);
   const rl = checkRateLimit(req, { max: 10, windowMs: 60_000 });
   if (!rl.ok) return rateLimitedResponse(rl);
 
@@ -114,7 +116,7 @@ export async function POST(req: NextRequest) {
   }
 
   const cacheKey = createHash("sha256")
-    .update(JSON.stringify({ a: body.abstract, t: validTerms }))
+    .update(JSON.stringify(config) + "\u0000" + JSON.stringify({ a: body.abstract, t: validTerms }))
     .digest("hex");
   const cached = CACHE.get(cacheKey);
   if (cached) return NextResponse.json({ ...cached, cached: true });
@@ -141,14 +143,14 @@ export async function POST(req: NextRequest) {
           `Return a corrected rewrite that keeps every listed term verbatim and every number, plain text only.`,
       });
     }
-    return llmComplete(messages);
+    return llmComplete(messages, { config });
   }
 
   // Any OpenAI-compatible endpoint works (see src/lib/llm.ts); without a
   // configured provider the route refuses honestly instead of shipping an
   // unverified rewrite. (Not cached — the provider can be configured at
   // any time without a stale refusal lingering in the process.)
-  if (!llmStatus().enabled) {
+  if (!llmStatus(config).enabled) {
     return NextResponse.json<CachedGloss>({
       rewrite: null,
       keptTerms: [],
@@ -179,7 +181,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   };
 
-  if (!rewrite) return fail("model-unavailable");
+  if (!rewrite) return NextResponse.json({ rewrite: null, keptTerms: [], numbersTotal: abstractNumbers.length, reason: "model-unavailable" });
   const finalCheck = verify(rewrite, validTerms, abstractNumbers);
   if (!finalCheck.ok) return fail("verification-failed");
 
@@ -198,5 +200,19 @@ function trimCache() {
     const oldest = CACHE.keys().next().value;
     if (oldest === undefined) break;
     CACHE.delete(oldest);
+  }
+}
+
+/** Private responses; provider errors never echo credentials or upstream bodies. */
+export async function POST(req: NextRequest) {
+  try {
+    const response = await handlePost(req);
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof LlmError ? error.message : "The AI request could not finish. Please try again." }, {
+      status: error instanceof LlmError ? error.status : 500,
+      headers: { "Cache-Control": "private, no-store" },
+    });
   }
 }

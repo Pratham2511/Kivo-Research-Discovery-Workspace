@@ -7,7 +7,8 @@
  * configured. To enable them, point the app at ANY OpenAI-compatible
  * chat-completions endpoint (OpenAI, Groq, Together, Mistral, DeepSeek,
  * OpenRouter, a local Ollama or llama.cpp server, …) with three optional
- * environment variables:
+ * environment variables as an operator-managed fallback. Browser Settings
+ * provide request-scoped credentials on hosted deployments:
  *
  *   LLM_API_KEY   the provider key (any non-empty string for local servers)
  *   LLM_BASE_URL  e.g. https://api.openai.com/v1      (default)
@@ -19,6 +20,30 @@
  * graphs, seminars, exports) is pure local computation and never touches
  * this module.
  */
+
+import { AI_PROVIDERS, validAiSettings, type LlmConfig } from "./ai-config";
+
+export class LlmError extends Error {
+  constructor(message: string, public readonly status = 502) { super(message); }
+}
+
+export function providerFailure(status: number): LlmError {
+  if (status === 401 || status === 403) return new LlmError("The provider rejected this key or its permissions. Check your API key in Settings.", 401);
+  if (status === 429) return new LlmError("Your AI provider's quota or rate limit was reached. Check your provider account or try later.", 429);
+  if (status === 404) return new LlmError("The provider could not find this model. Check the model ID in Settings.", 400);
+  return new LlmError("The AI provider could not complete the request. Check your model and provider account, then try again.");
+}
+
+/** Request-scoped only: never write a visitor's credentials into process.env. */
+export function requestLlmConfig(headers: Headers): LlmConfig | null {
+  const provider = headers.get("x-kivo-ai-provider");
+  const apiKey = headers.get("x-kivo-ai-key");
+  const model = headers.get("x-kivo-ai-model");
+  if (provider === null && apiKey === null && model === null) return resolveConfig();
+  const settings = { provider, apiKey, model };
+  if (!validAiSettings(settings)) throw new LlmError("Invalid AI settings. Choose a provider and check the key and model in Settings.", 400);
+  return { apiKey: settings.apiKey, model: settings.model, baseUrl: AI_PROVIDERS[settings.provider].baseUrl };
+}
 
 export interface LlmMessage {
   role: "system" | "user" | "assistant";
@@ -56,8 +81,7 @@ function resolveConfig(): { apiKey: string; baseUrl: string; model: string } | n
  * The label deliberately shows only the model and endpoint host — never
  * the key.
  */
-export function llmStatus(): LlmStatus {
-  const config = resolveConfig();
+export function llmStatus(config: LlmConfig | null = resolveConfig()): LlmStatus {
   if (!config) return { enabled: false, label: null };
   let host = config.baseUrl;
   try {
@@ -71,23 +95,24 @@ export function llmStatus(): LlmStatus {
 /**
  * One chat completion against the configured OpenAI-compatible endpoint.
  *
- * Returns the message text, or null when: no provider is configured, the
- * request fails, times out, or returns an empty/oddly-shaped body. Callers
- * treat null as "model unavailable" and abstain — a research desk would
- * rather show nothing than something unverifiable.
+ * Returns message text, or null for a disabled provider or empty body.
+ * Connection and provider failures throw a sanitized LlmError; route
+ * handlers return the safe message without upstream bodies or credentials.
  */
 export async function llmComplete(
   messages: LlmMessage[],
-  opts: { timeoutMs?: number; temperature?: number } = {},
+  opts: { timeoutMs?: number; temperature?: number; config?: LlmConfig | null; maxTokens?: number } = {},
 ): Promise<string | null> {
-  const config = resolveConfig();
+  const config = opts.config === undefined ? resolveConfig() : opts.config;
   if (!config) return null;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 30_000);
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 25_000);
   try {
     const res = await fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST",
+      cache: "no-store",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${config.apiKey}`,
@@ -96,10 +121,11 @@ export async function llmComplete(
         model: config.model,
         messages,
         temperature: opts.temperature ?? 0.2,
+        ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
       }),
       signal: controller.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) throw providerFailure(res.status);
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string | null } }>;
     };
@@ -107,8 +133,9 @@ export async function llmComplete(
     return typeof text === "string" && text.trim().length > 0
       ? text.trim()
       : null;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof LlmError) throw error;
+    throw new LlmError(controller.signal.aborted ? "The AI provider timed out. Try again or select a faster model in Settings." : "Could not connect to the AI provider. Try again shortly.", controller.signal.aborted ? 504 : 502);
   } finally {
     clearTimeout(timer);
   }

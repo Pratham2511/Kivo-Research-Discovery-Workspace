@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 export async function resolve(specifier, context, nextResolve) {
+  if (specifier === "next/server") return nextResolve("next/server.js", context);
   let url;
   if (specifier.startsWith("@/")) url = new URL("../src/" + specifier.slice(2), import.meta.url);
   else if (specifier.startsWith(".") && context.parentURL?.startsWith("file:")) url = new URL(specifier, context.parentURL);

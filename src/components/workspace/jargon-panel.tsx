@@ -15,6 +15,7 @@ import {
   BookMarked,
 } from "lucide-react";
 import { toast } from "sonner";
+import { aiHeaders } from "@/lib/ai-browser";
 import type { Paper } from "./paper-card";
 import {
   detectJargon,
@@ -47,7 +48,7 @@ const ABSTAIN_TEXT: Record<
   "model-unavailable":
     "The plain-language editor is unreachable right now. Try again in a moment.",
   "not-configured":
-    "No AI provider is configured on this desk, so the plain-language rewrite is switched off. Set LLM_API_KEY (plus optional LLM_BASE_URL / LLM_MODEL — any OpenAI-compatible endpoint works; see the README) to enable it. The grade, heatmap and glossary above are computed locally and always work.",
+    "Open Settings below Alerts and add your AI provider key to enable the plain-language rewrite. The reading grade, heatmap, and glossary work locally without a key.",
 };
 
 const DENSITY_TONE: Record<string, string> = {
@@ -88,7 +89,8 @@ export function JargonPanel({ paper }: { paper: Paper }) {
     try {
       const res = await fetch("/api/gloss", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: aiHeaders(),
+          cache: "no-store",
         body: JSON.stringify({
           paperId: paper.id,
           abstract: paper.abstract,

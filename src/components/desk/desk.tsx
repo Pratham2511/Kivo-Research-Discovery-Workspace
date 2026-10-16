@@ -15,6 +15,7 @@ import { UpdatesView } from "../workspace/updates-view";
 import { ReviewView } from "../workspace/review-view";
 import { GraphView } from "../workspace/graph-view";
 import { BuilderView } from "../workspace/builder-view";
+import { SettingsView } from "../workspace/settings-view";
 import type { Paper } from "../workspace/paper-card";
 import type { ClaimStance, Evidence, Repro } from "@/lib/workspace/schema";
 import {
@@ -1005,6 +1006,7 @@ export function Desk({ section, initialQuery = "" }: DeskProps) {
       storageError={storageError}
     >
       {!ready ? <div className="workspace-loading" role="status">Opening your research workspace…</div> : <>
+      {currentSection === "settings" && <SettingsView />}
       {/* 1. Discover View */}
       {currentSection === "discover" && (
         <DiscoverView

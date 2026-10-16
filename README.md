@@ -69,7 +69,19 @@ The default theme uses **pure black, white, and hot crimson (`#FF0055`)**, with 
 - Optional abstract rewrites with checks that detected terms and numeric values are preserved.
 - Citation-context classifications using a disclosed heuristic.
 
-These checks help keep sources traceable; they do not establish that every interpretation is correct. AI features remain unavailable until a provider is configured.
+These checks help keep sources traceable; they do not establish that every interpretation is correct. Connect your own provider in **Settings**, below Alerts, to enable both AI features.
+
+### Connect your AI provider
+
+1. Open **Settings** in the workspace and choose a provider. Google AI Studio (Gemini) is selected by default; OpenAI, Groq, and OpenRouter are also supported.
+2. Paste your API key into the password field and choose a text model available to your account. See [Google's current models](https://ai.google.dev/gemini-api/docs/models) and [Gemini's OpenAI-compatible API](https://ai.google.dev/gemini-api/docs/openai).
+3. Select **Save settings**. Both **Ask the paper** (abstract and extracted PDF pages) and the plain-language abstract rewrite use the saved configuration immediately.
+
+The key is stored in **this tab's sessionStorage**, separate from research records and backups. It survives a page reload and is never written to the deployment environment or made available to other visitors. Browser session restore may retain it; use **Clear key** to remove it explicitly. Each device and browser session needs its own configuration.
+
+**Test connection** makes one authenticated provider metadata request without generating an answer or sending paper text. It checks provider access; a model must still be available to your account. Saving settings makes no API request. Actual AI requests send the key and relevant source text through Kivo's server to the selected provider over HTTPS. Normal provider limits and charges apply.
+
+Visitor-supplied endpoints are restricted to the listed providers, redirects are refused, credentials are never returned in responses, and answer caches are isolated by credentials and model. No database is needed, including on Vercel.
 
 ## Getting started
 
@@ -95,7 +107,7 @@ No `.env` file is required for the default search and evidence workflows.
 
 ## Configuration
 
-To enable optional integrations, copy the example and add credentials **locally**:
+Browser AI settings require no environment changes. To configure optional scholarly integrations or an operator-managed AI fallback, copy the example and add credentials **locally**:
 
 ```bash
 cp .env.example .env.local
@@ -112,7 +124,7 @@ cp .env.example .env.local
 | `IEEE_API_KEY` | Enable IEEE Xplore search. |
 | `ACADEMIC_CONTACT_EMAIL` | Optional contact address for scholarly provider requests. |
 
-`OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `OPENAI_MODEL` are accepted aliases. See [.env.example](.env.example) for details. Configured scholarly sources become selectable after the application reloads.
+`OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `OPENAI_MODEL` are accepted aliases. A visitor's saved AI settings take precedence for their requests; environment credentials are only the operator-managed fallback. See [.env.example](.env.example) for details. Configured scholarly sources become selectable after the application reloads.
 
 Keep credentials in server-side environment variables. Never use a `NEXT_PUBLIC_` variable for a secret, commit a real environment file, or attach a private workspace backup to a public issue.
 
@@ -151,7 +163,7 @@ npm test
 npm run build
 ```
 
-The regression suite covers pagination, reversible sorting, filter validation, durable storage and fallback recovery, source URL handling, export encoding, and PDF extraction. CI runs lint, TypeScript checks, and the tests on pushes to `main` and pull requests.
+The regression suite covers pagination, reversible sorting, filter validation, durable storage and fallback recovery, source URL handling, export encoding, PDF extraction, browser AI settings, request isolation, grounded PDF answers, abstract rewrites, and credential-safe provider errors. AI tests use mocked providers and consume no API quota. CI runs lint, TypeScript checks, and the tests on pushes to `main` and pull requests.
 
 The current redesign was checked in a production build, including an eight-page public research PDF, a 5 MB synthetic PDF, filtered exports, reload persistence, and mobile search. See [Changelog](CHANGELOG.md) for release notes.
 

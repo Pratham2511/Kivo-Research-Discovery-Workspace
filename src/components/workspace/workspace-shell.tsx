@@ -1,12 +1,12 @@
 "use client";
 
-import { Compass, Bookmark, FolderGit2, Scale, BookOpen, Bell, Download, Brain, Network, PenLine, ArrowUpRight, AlertCircle } from "lucide-react";
+import { Compass, Bookmark, FolderGit2, Scale, BookOpen, Bell, Download, Brain, Network, PenLine, ArrowUpRight, AlertCircle, Settings2 } from "lucide-react";
 import Link from "next/link";
 import type { StorageStatus } from "../desk/use-workspace";
 import { ThemeToggle } from "../theme-toggle";
 import { KivoLogo } from "../kivo-logo";
 
-export type ActiveSection = "discover" | "reading" | "saved" | "projects" | "compare" | "updates" | "review" | "graph" | "builder";
+export type ActiveSection = "discover" | "reading" | "saved" | "projects" | "compare" | "updates" | "review" | "graph" | "builder" | "settings";
 interface WorkspaceShellProps {
   currentSection: ActiveSection;
   onNavigate: (section: ActiveSection) => void;
@@ -31,6 +31,7 @@ const NAV_ITEMS: { id: ActiveSection; label: string; short: string; icon: typeof
   { id: "builder", label: "Argument builder", short: "Build", icon: PenLine, group: "Develop your review" },
   { id: "review", label: "Review", short: "Review", icon: Brain, group: "Develop your review" },
   { id: "updates", label: "Alerts", short: "Alerts", icon: Bell, group: "Develop your review" },
+  { id: "settings", label: "Settings", short: "Settings", icon: Settings2, group: "Develop your review" },
 ];
 
 export function WorkspaceShell(props: WorkspaceShellProps) {

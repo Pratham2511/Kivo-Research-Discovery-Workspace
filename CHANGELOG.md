@@ -9,6 +9,14 @@ For the live product overview, quick start, and architecture, see the
 
 ---
 
+## Unreleased — private browser AI settings
+
+- Add Settings below Alerts on desktop and mobile, with Google AI Studio selected by default, other provider presets, an editable model ID, a masked key field, and explicit save/clear controls.
+- Keep visitor keys in tab session storage, separate from workspace backups and deployment configuration. Forward credentials only on AI requests to fixed HTTPS provider endpoints.
+- Apply the same request-scoped provider to grounded abstract/PDF Q&A and verified plain-language rewrites. Isolate cached results by credentials and model; return private, non-cacheable responses and sanitized provider errors.
+- Add a connection check that performs one provider metadata request without generating an answer. Keep optional operator environment configuration as a fallback.
+- Add mocked integration coverage for browser storage, credential isolation, fixed endpoints, PDF quote verification, abstract rewrites, and error redaction.
+
 ## Unreleased — crimson identity and landing hero
 
 - Replace orange brand accents with hot crimson (`#FF0055`) across the landing page, workspace, logo, and diagram exports; retain readable darker accent text in the light theme.

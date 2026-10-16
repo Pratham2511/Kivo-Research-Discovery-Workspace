@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { llmComplete, llmStatus } from "@/lib/llm";
+import { requestLlmConfig, LlmError, llmComplete, llmStatus } from "@/lib/llm";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/security";
 import { groundedQuotes, matchingPassages } from "@/lib/workspace/grounding";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * POST /api/ask — grounded Q&A over one paper's stored text.
@@ -79,7 +80,8 @@ function extractJson(raw: string): { answer: string | null; quotes?: unknown } |
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePost(req: NextRequest) {
+  const config = requestLlmConfig(req.headers);
   const rl = checkRateLimit(req, { max: 10, windowMs: 60_000 });
   if (!rl.ok) return rateLimitedResponse(rl);
 
@@ -105,7 +107,7 @@ export async function POST(req: NextRequest) {
 
   // Cache by (sources + question) — identical asks are free.
   const cacheKey = createHash("sha256")
-    .update(question + "\u0000" + JSON.stringify(passages))
+    .update(JSON.stringify(config) + "\u0000" + question + "\u0000" + JSON.stringify(passages))
     .digest("hex");
   const cached = CACHE.get(cacheKey);
   if (cached) return NextResponse.json({ ...cached, cached: true });
@@ -125,7 +127,7 @@ export async function POST(req: NextRequest) {
   // 2. Ask the model, strictly from the retrieved passages. Any
   //    OpenAI-compatible endpoint works (see src/lib/llm.ts); without a
   //    configured provider the route abstains honestly instead of guessing.
-  if (!llmStatus().enabled) {
+  if (!llmStatus(config).enabled) {
     const abstain: CachedAnswer = {
       answer: null,
       quotes: [],
@@ -144,8 +146,9 @@ export async function POST(req: NextRequest) {
     raw = await llmComplete([
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userMessage },
-    ]);
-  } catch {
+    ], { config });
+  } catch (error) {
+    if (error instanceof LlmError) throw error;
     raw = null;
   }
 
@@ -172,7 +175,7 @@ export async function POST(req: NextRequest) {
         content:
           "That was not valid JSON per the contract. Return ONLY the JSON object now.",
       },
-    ]);
+    ], { config });
     if (retry) parsed = extractJson(retry);
   }
 
@@ -213,5 +216,19 @@ function trimCache() {
     const oldest = CACHE.keys().next().value;
     if (oldest === undefined) break;
     CACHE.delete(oldest);
+  }
+}
+
+/** Private responses; provider errors never echo credentials or upstream bodies. */
+export async function POST(req: NextRequest) {
+  try {
+    const response = await handlePost(req);
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof LlmError ? error.message : "The AI request could not finish. Please try again." }, {
+      status: error instanceof LlmError ? error.status : 500,
+      headers: { "Cache-Control": "private, no-store" },
+    });
   }
 }

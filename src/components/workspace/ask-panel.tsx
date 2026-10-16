@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { aiHeaders } from "@/lib/ai-browser";
 import type { DocumentRecord } from "@/lib/workspace/schema";
 import type { Paper } from "./paper-card";
 
@@ -59,7 +60,7 @@ const ABSTAIN_TEXT: Record<NonNullable<AskEntry["reason"]>, string> = {
   "model-unavailable":
     "The assistant is unreachable right now. Try again in a moment.",
   "not-configured":
-    "No AI provider is configured on this desk, so grounded answers are switched off. Set LLM_API_KEY (plus optional LLM_BASE_URL / LLM_MODEL — any OpenAI-compatible endpoint works; see the README) to enable them. Every other tool keeps working without one.",
+    "Open Settings below Alerts and add your AI provider key to enable answers from this paper. The key applies only to this browser session. Other research tools work without it.",
 };
 
 function sourceLabel(page: number): string {
@@ -115,7 +116,8 @@ export function AskPanel({ paper, document, onGoToPage }: AskPanelProps) {
       try {
         const res = await fetch("/api/ask", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: aiHeaders(),
+          cache: "no-store",
           body: JSON.stringify({ question: trimmed, paperId: paper.id, passages: sources }),
         });
         if (!res.ok) {
