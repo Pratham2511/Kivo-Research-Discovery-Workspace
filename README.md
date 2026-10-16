@@ -74,12 +74,14 @@ These checks help keep sources traceable; they do not establish that every inter
 ### Connect your AI provider
 
 1. Open **Settings** in the workspace and choose a provider. Google AI Studio (Gemini) is selected by default; OpenAI, Groq, and OpenRouter are also supported.
-2. Paste your API key into the password field and choose a text model available to your account. See [Google's current models](https://ai.google.dev/gemini-api/docs/models) and [Gemini's OpenAI-compatible API](https://ai.google.dev/gemini-api/docs/openai).
-3. Select **Save settings**. Both **Ask the paper** (abstract and extracted PDF pages) and the plain-language abstract rewrite use the saved configuration immediately.
+2. Paste your API key into the password field and select **Load provider models**. Choose a text model from the returned catalog, or enter its exact ID manually. Google has no preselected model; model listings do not guarantee free-tier quota. See [Google's current models](https://ai.google.dev/gemini-api/docs/models) and [API pricing and free-tier availability](https://ai.google.dev/gemini-api/docs/pricing).
+3. Select **Test & save · 1 AI request** to verify one short generation on that exact model and save the working configuration. Both **Ask the paper** (abstract and extracted PDF pages) and the plain-language abstract rewrite use it immediately. **Save settings** also allows saving without a generation test.
 
 The key is stored in **this tab's sessionStorage**, separate from research records and backups. It survives a page reload and is never written to the deployment environment or made available to other visitors. Browser session restore may retain it; use **Clear key** to remove it explicitly. Each device and browser session needs its own configuration.
 
-**Test connection** makes one authenticated provider metadata request without generating an answer or sending paper text. It checks provider access; a model must still be available to your account. Saving settings makes no API request. Actual AI requests send the key and relevant source text through Kivo's server to the selected provider over HTTPS. Normal provider limits and charges apply.
+**Load provider models** makes a metadata request without generating text. **Test & save** makes exactly one short generation, with no automatic retries or paper text, and can consume provider quota. It reports success only after the selected model returns text. Quota, tier, key, and unsupported-model failures remain visible. Saving settings alone makes no API request. Actual AI requests send the key and relevant source text through Kivo's server to the selected provider over HTTPS. Normal provider limits and charges apply.
+
+Gemini uses Google's native `generateContent` API with the `x-goog-api-key` header, including for AI Studio authorization keys. Other listed providers use their OpenAI-compatible endpoints. Neither model catalogs nor connection responses include credentials.
 
 Visitor-supplied endpoints are restricted to the listed providers, redirects are refused, credentials are never returned in responses, and answer caches are isolated by credentials and model. No database is needed, including on Vercel.
 

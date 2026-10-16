@@ -27,7 +27,14 @@ export class LlmError extends Error {
   constructor(message: string, public readonly status = 502) { super(message); }
 }
 
-export function providerFailure(status: number): LlmError {
+export function providerFailure(status: number, body?: unknown): LlmError {
+  // Classify upstream errors without echoing their message, key, or project IDs.
+  const normalized = Array.isArray(body) ? body[0] : body;
+  const error = normalized && typeof normalized === "object" ? (normalized as { error?: unknown }).error : null;
+  const message = typeof error === "string" ? error : error && typeof error === "object" ? JSON.stringify(error) : "";
+  if (/API_KEY_INVALID|API key not valid|UNAUTHENTICATED|ACCESS_TOKEN_TYPE_UNSUPPORTED|API_KEY_SERVICE_BLOCKED|API_KEY_HTTP_REFERRER_BLOCKED|API_KEY_IP_ADDRESS_BLOCKED/i.test(message)) return new LlmError("Google rejected the key or its restrictions. Use an active Gemini API key from AI Studio and check its API and application restrictions.", 401);
+  if (/FAILED_PRECONDITION|billing|free tier.*not available|not available.*free tier/i.test(message)) return new LlmError("This model is unavailable for your account, region, or billing tier. Choose another model in Settings and check its free-tier quota in AI Studio.", 400);
+  if (status === 400 && /not supported|not found|INVALID_ARGUMENT|model/i.test(message)) return new LlmError("The provider rejected the model or request settings. Load models in Settings, choose a text model, then test it.", 400);
   if (status === 401 || status === 403) return new LlmError("The provider rejected this key or its permissions. Check your API key in Settings.", 401);
   if (status === 429) return new LlmError("Your AI provider's quota or rate limit was reached. Check your provider account or try later.", 429);
   if (status === 404) return new LlmError("The provider could not find this model. Check the model ID in Settings.", 400);
@@ -35,15 +42,25 @@ export function providerFailure(status: number): LlmError {
 }
 
 /** Request-scoped only: never write a visitor's credentials into process.env. */
-export function requestLlmConfig(headers: Headers): LlmConfig | null {
+export function requestLlmConfig(headers: Headers, allowMissingModel = false): LlmConfig | null {
   const provider = headers.get("x-kivo-ai-provider");
   const apiKey = headers.get("x-kivo-ai-key");
   const model = headers.get("x-kivo-ai-model");
   if (provider === null && apiKey === null && model === null) return resolveConfig();
-  const settings = { provider, apiKey, model };
+  const settings = { provider, apiKey, model: model || (allowMissingModel ? "catalog" : "") };
   if (!validAiSettings(settings)) throw new LlmError("Invalid AI settings. Choose a provider and check the key and model in Settings.", 400);
-  return { apiKey: settings.apiKey, model: settings.model, baseUrl: AI_PROVIDERS[settings.provider].baseUrl };
+  return { apiKey: settings.apiKey, model: settings.model.replace(/^models\//, ""), baseUrl: AI_PROVIDERS[settings.provider].baseUrl, provider: settings.provider };
 }
+
+export function isGoogleConfig(config: LlmConfig): boolean {
+  return config.provider === "google" || /^https:\/\/generativelanguage\.googleapis\.com\/v1beta(?:\/openai)?\/?$/.test(config.baseUrl);
+}
+
+export function providerHeaders(config: LlmConfig): Record<string, string> {
+  return isGoogleConfig(config) ? { "Content-Type": "application/json", "x-goog-api-key": config.apiKey } : { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` };
+}
+
+export function googleBaseUrl(): string { return AI_PROVIDERS.google.baseUrl; }
 
 export interface LlmMessage {
   role: "system" | "user" | "assistant";
@@ -109,27 +126,33 @@ export async function llmComplete(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 25_000);
   try {
-    const res = await fetch(`${config.baseUrl}/chat/completions`, {
+    const google = isGoogleConfig(config);
+    const model = config.model.replace(/^models\//, "");
+    const systems = messages.filter(message => message.role === "system").map(message => ({ text: message.content }));
+    const generationConfig = {
+      temperature: opts.temperature ?? 0.2,
+      maxOutputTokens: opts.maxTokens ?? 2048,
+      ...(/^gemini-2\.5-(?:flash|flash-lite)(?:-|$)/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+    };
+    const payload = google ? {
+      contents: messages.filter(message => message.role !== "system").map(message => ({ role: message.role === "assistant" ? "model" : "user", parts: [{ text: message.content }] })),
+      ...(systems.length ? { systemInstruction: { parts: systems } } : {}),
+      generationConfig,
+    } : { model, messages, temperature: opts.temperature ?? 0.2, ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}) };
+    const res = await fetch(google ? `${googleBaseUrl()}/models/${encodeURIComponent(model)}:generateContent` : `${config.baseUrl}/chat/completions`, {
       method: "POST",
       cache: "no-store",
       redirect: "error",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages,
-        temperature: opts.temperature ?? 0.2,
-        ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
-      }),
+      headers: providerHeaders(config),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    if (!res.ok) throw providerFailure(res.status);
+    if (!res.ok) throw providerFailure(res.status, await res.json().catch(() => null));
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string | null } }>;
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
     };
-    const text = data.choices?.[0]?.message?.content;
+    const text = google ? data.candidates?.[0]?.content?.parts?.filter(part => !part.thought && typeof part.text === "string").map(part => part.text).join("\n") : data.choices?.[0]?.message?.content;
     return typeof text === "string" && text.trim().length > 0
       ? text.trim()
       : null;

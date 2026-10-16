@@ -9,6 +9,14 @@ For the live product overview, quick start, and architecture, see the
 
 ---
 
+## Unreleased — verify Gemini models before reporting success
+
+- Remove the preselected Gemini model and add a live provider model catalog, normalized model IDs, and a text-model selector.
+- Replace metadata-only connection success with one real generation on the selected model. Save the tested configuration automatically after success.
+- Use Google's native Gemini API and API-key authentication; preserve system prompts, retry conversation roles, PDF quote grounding, and rewrite verification.
+- Explain account/tier, model, authentication, and quota failures without exposing provider error bodies or credentials.
+- Add regression coverage for model discovery, rejected generations after successful metadata access, and native Gemini message conversion.
+
 ## Unreleased — private browser AI settings
 
 - Add Settings below Alerts on desktop and mobile, with Google AI Studio selected by default, other provider presets, an editable model ID, a masked key field, and explicit save/clear controls.
